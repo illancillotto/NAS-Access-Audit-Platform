@@ -1,0 +1,95 @@
+# NAS Access Audit Platform
+
+Piattaforma interna per audit, consultazione e validazione degli accessi al NAS Synology del Consorzio di Bonifica dell'Oristanese.
+
+## Obiettivo
+
+L'applicazione centralizza la visibilita sugli accessi a utenti, gruppi e cartelle condivise, calcola i permessi effettivi e supporta il workflow di review dei responsabili di settore. Il MVP e orientato ad audit e reporting, senza modifiche automatiche ai permessi del NAS.
+
+## Stack
+
+- Backend: FastAPI, SQLAlchemy, Alembic, PostgreSQL
+- Frontend: Next.js, React, TypeScript
+- DevOps: Docker, Docker Compose, Nginx
+- CI: GitHub Actions
+
+## Struttura Repository
+
+```text
+.
+|-- backend/
+|   |-- alembic/
+|   |-- app/
+|   |-- tests/
+|   |-- Dockerfile
+|   |-- alembic.ini
+|   `-- requirements.txt
+|-- docs/
+|   |-- ARCHITECTURE.md
+|   |-- CODEX_PROMPT.md
+|   |-- DEPLOYMENT.md
+|   |-- IMPLEMENTATION_PLAN.md
+|   `-- PRD.md
+|-- frontend/
+|   |-- src/
+|   |-- Dockerfile
+|   `-- package.json
+|-- nginx/
+|   `-- nginx.conf
+|-- scripts/
+|   |-- backend-shell.sh
+|   |-- frontend-shell.sh
+|   |-- migrate.sh
+|   |-- start-backend.sh
+|   |-- start-frontend.sh
+|   |-- start-nginx.sh
+|   |-- start-postgres.sh
+|   `-- wait-for-db.sh
+|-- .github/workflows/
+|-- .editorconfig
+|-- .env.example
+|-- .gitignore
+|-- Makefile
+|-- docker-compose.override.yml
+`-- docker-compose.yml
+```
+
+## Quick Start
+
+1. Copiare il file ambiente:
+   `cp .env.example .env`
+2. Avviare lo stack:
+   `make up`
+3. Eseguire la migrazione iniziale:
+   `make migrate`
+4. Verificare i servizi:
+   - frontend: `http://localhost:3000`
+   - backend health: `http://localhost:8000/health`
+   - nginx entrypoint: `http://localhost:8080`
+
+## Documentazione Disponibile
+
+- [PRD](docs/PRD.md)
+- [Piano implementazione](docs/IMPLEMENTATION_PLAN.md)
+- [Architettura](docs/ARCHITECTURE.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Prompt Codex](docs/CODEX_PROMPT.md)
+
+## Stato Progetto
+
+Bootstrap iniziale completato per sviluppo incrementale:
+
+- backend FastAPI avviabile con endpoint `/health`
+- frontend Next.js con layout base e route `/login`
+- stack Docker Compose per backend, frontend, postgres e nginx
+- documentazione iniziale coerente per prodotto, architettura e deployment
+
+## Comandi Utili
+
+- `make up`: avvio stack locale
+- `make down`: stop e cleanup container
+- `make logs`: tail dei log
+- `make rebuild`: rebuild immagini e restart
+- `make backend-shell`: shell nel container backend
+- `make frontend-shell`: shell nel container frontend
+- `make migrate`: esecuzione migrazioni Alembic
