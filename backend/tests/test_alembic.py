@@ -21,3 +21,12 @@ def test_initial_migration_creates_snapshots_table() -> None:
     assert '"snapshots"' in migration
     assert '"status"' in migration
     assert 'op.create_index("ix_snapshots_id"' in migration
+
+
+def test_audit_domain_migration_creates_core_tables() -> None:
+    migration = (
+        ROOT / "backend" / "alembic" / "versions" / "20260320_0003_audit_domain_minimum.py"
+    ).read_text(encoding="utf-8")
+
+    for table_name in ['"nas_users"', '"nas_groups"', '"shares"', '"reviews"']:
+        assert table_name in migration

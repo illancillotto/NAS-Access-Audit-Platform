@@ -9,6 +9,9 @@ def test_settings_use_expected_defaults() -> None:
     assert settings.app_env == "development"
     assert settings.backend_host == "0.0.0.0"
     assert settings.backend_port == 8000
+    assert settings.jwt_secret_key == "change_this_secret"
+    assert settings.jwt_expire_minutes == 60
+    assert settings.jwt_algorithm == "HS256"
     assert settings.database_url.startswith("postgresql+psycopg://")
 
 

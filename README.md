@@ -71,15 +71,18 @@ L'applicazione centralizza la visibilita sugli accessi a utenti, gruppi e cartel
 
 - [PRD](docs/PRD.md)
 - [Piano implementazione](docs/IMPLEMENTATION_PLAN.md)
+- [Execution Plan](docs/EXECUTION_PLAN.md)
 - [Architettura](docs/ARCHITECTURE.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Prompt Codex](docs/CODEX_PROMPT.md)
+- [Progress](docs/PROGRESS.md)
 
 ## Stato Progetto
 
 Bootstrap iniziale completato per sviluppo incrementale:
 
 - backend FastAPI avviabile con endpoint `/health`
+- autenticazione applicativa base con `POST /auth/login` e `GET /auth/me`
 - frontend Next.js con layout base e route `/login`
 - stack Docker Compose per backend, frontend, postgres e nginx
 - documentazione iniziale coerente per prodotto, architettura e deployment

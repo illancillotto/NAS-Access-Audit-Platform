@@ -25,10 +25,10 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
-      - name: Placeholder lint
+      - name: Syntax check
         working-directory: backend
         run: python -m compileall app tests
 
-      - name: Placeholder tests
+      - name: Test suite
         working-directory: backend
         run: pytest -q
