@@ -84,6 +84,7 @@ Bootstrap iniziale completato per sviluppo incrementale:
 - backend FastAPI avviabile con endpoint `/health`
 - autenticazione applicativa base con `POST /auth/login` e `GET /auth/me`
 - skeleton integrazione NAS con parser iniziali e endpoint `GET /sync/capabilities`, `POST /sync/preview`
+- permission engine MVP con preview `POST /permissions/calculate-preview` e lista `GET /effective-permissions`
 - frontend Next.js con layout base e route `/login`
 - stack Docker Compose per backend, frontend, postgres e nginx
 - documentazione iniziale coerente per prodotto, architettura e deployment

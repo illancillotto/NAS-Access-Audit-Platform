@@ -70,6 +70,21 @@ a {
   border-radius: 12px;
 }
 
+.sidebar-footer {
+  margin-top: 28px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-footer small,
+.sidebar-footer span {
+  color: rgba(246, 244, 239, 0.78);
+}
+
 .content {
   padding: 28px;
 }
@@ -172,6 +187,31 @@ a {
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.button-secondary {
+  background: rgba(255, 255, 255, 0.14);
+  color: #f6f4ef;
+}
+
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.status-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.error-text {
+  color: #8d2d2d;
 }
 
 @media (max-width: 960px) {

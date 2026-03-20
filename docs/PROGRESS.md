@@ -6,7 +6,7 @@
 
 ## Stato Generale
 
-Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora tre capability backend reali: autenticazione applicativa con JWT, dominio audit minimo in sola lettura e skeleton di integrazione NAS con parser iniziali e preview di sync.
+Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora quattro capability backend reali: autenticazione applicativa con JWT, dominio audit minimo in sola lettura, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo.
 
 ## Completato
 
@@ -24,15 +24,19 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 - endpoint `POST /auth/login` e `GET /auth/me`
 - endpoint protetti `GET /dashboard/summary`, `GET /nas-users`, `GET /nas-groups`, `GET /shares`, `GET /reviews`
 - endpoint protetti `GET /sync/capabilities` e `POST /sync/preview`
+- endpoint protetti `POST /permissions/calculate-preview` e `GET /effective-permissions`
 - configurazione centralizzata con `pydantic-settings`
 - utility di sicurezza per password hash e token JWT
 - modello `ApplicationUser`
 - modelli `NasUser`, `NasGroup`, `Share`, `Review`
+- modelli `PermissionEntry` ed `EffectivePermission`
 - config NAS centralizzata e client skeleton
 - parser iniziali per passwd, group, share listing e ACL
+- servizio di calcolo permessi con regole `deny` e `write implies read`
 - struttura Alembic presente con migration iniziale `snapshots`
 - seconda migration per `application_users`
 - terza migration per il dominio audit minimo
+- quarta migration per il permission engine MVP
 
 ### Frontend
 
@@ -60,7 +64,7 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 ### Backend
 
 - suite `backend/tests`
-- stato corrente: `34 passed`
+- stato corrente: `39 passed`
 
 Copertura attuale:
 
@@ -68,12 +72,15 @@ Copertura attuale:
 - login e current user
 - dashboard summary e liste dominio audit
 - sync capabilities e preview NAS
+- permission preview e lista effective permissions
 - metadata applicazione FastAPI
 - settings e override ambiente
 - wiring Alembic e migration iniziale
 - wiring security e migration utenti applicativi
 - migration dominio audit minimo
+- migration permission engine MVP
 - parser NAS e connector skeleton
+- servizio calcolo permessi
 - scaffold repository e file chiave
 
 ### Frontend
@@ -93,6 +100,7 @@ Copertura attuale:
 - auth applicativa presente ma senza bootstrap admin
 - dominio audit minimo presente ma senza sync reale persistente
 - integrazione NAS solo a livello skeleton, senza SSH live
+- permission engine presente ma non ancora alimentato da sync persistente
 - nessuna dashboard con dati reali
 - nessun test di build frontend completo
 - nessun test di esecuzione compose/nginx
@@ -107,20 +115,21 @@ Copertura attuale:
 - primo flusso backend reale gia implementato e testato
 - dominio audit minimo esposto con API protette e testato end-to-end
 - skeleton NAS gia testabile senza dipendere da un host reale
+- permission engine MVP gia calcolabile e testato
 - test iniziali gia utili per evitare regressioni di scaffold
 
 ### Punti da Rafforzare Subito
 
-- introdurre sync reale persistente dal NAS
+- collegare il permission engine al futuro sync persistente
 - aggiungere test su API future e servizi
 - verificare build frontend in ambiente CI reale
 - aggiungere test e smoke check su compose e health integrati
 
 ## Prossimi Passi Raccomandati
 
-1. iniziare il permission engine MVP
+1. esporre dati backend reali nel frontend applicativo
 2. introdurre sync reale persistente dal NAS
-3. esporre dati mock o reali nella dashboard frontend
+3. collegare il permission engine ai dati persistiti
 4. aggiungere bootstrap admin o seed iniziale gestito
 5. ampliare CI con test build/run piu vicini al runtime reale
 6. aggiungere smoke check compose e runtime integrati

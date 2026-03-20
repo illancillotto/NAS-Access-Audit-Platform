@@ -61,6 +61,10 @@ Stato:
 - servizio di calcolo con regole minime `allow`, `deny`, `write implies read`
 - test unitari su casi principali
 
+Stato:
+
+- completato
+
 ## Milestone 5. Frontend Applicativo
 
 - login reale contro backend
@@ -77,7 +81,7 @@ Stato:
 
 ## Ordine di Esecuzione Corrente
 
-1. entrare in Milestone 4 sul permission engine MVP
+1. entrare in Milestone 5 sul frontend applicativo
 2. aggiornare `docs/PROGRESS.md` a ogni tranche
 3. rieseguire test backend e frontend a ogni milestone
 4. mantenere CI allineata ai test reali

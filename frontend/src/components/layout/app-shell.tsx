@@ -1,7 +1,22 @@
+"use client";
+
 import Link from "next/link";
 import { PropsWithChildren } from "react";
 
-export function AppShell({ children }: PropsWithChildren) {
+import { clearStoredAccessToken } from "@/lib/auth";
+import type { CurrentUser } from "@/types/api";
+
+type AppShellProps = PropsWithChildren<{
+  currentUser?: CurrentUser | null;
+  onLogout?: () => void;
+}>;
+
+export function AppShell({ children, currentUser, onLogout }: AppShellProps) {
+  function handleLogout(): void {
+    clearStoredAccessToken();
+    onLogout?.();
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -16,6 +31,24 @@ export function AppShell({ children }: PropsWithChildren) {
           <Link href="/">Snapshot</Link>
           <Link href="/">Review</Link>
         </nav>
+        <div className="sidebar-footer">
+          {currentUser ? (
+            <>
+              <small>Sessione attiva</small>
+              <strong>{currentUser.username}</strong>
+              <span>{currentUser.role}</span>
+              <button className="button button-secondary" onClick={handleLogout} type="button">
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <small>Sessione</small>
+              <strong>Nessun login</strong>
+              <span>Accedi per vedere dati backend reali</span>
+            </>
+          )}
+        </div>
       </aside>
       <main className="content">{children}</main>
     </div>

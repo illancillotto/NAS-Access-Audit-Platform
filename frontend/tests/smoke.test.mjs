@@ -31,12 +31,21 @@ test("home page contains dashboard bootstrap copy", () => {
   assert.match(homePage, /Utenti NAS/);
 });
 
-test("login page contains placeholder access form", () => {
+test("login page contains real access form", () => {
   const loginPage = read("src/app/login/page.tsx");
 
-  assert.match(loginPage, /Placeholder login/);
+  assert.match(loginPage, /Login applicativo/);
+  assert.match(loginPage, /backend FastAPI reale/);
   assert.match(loginPage, /Username o email/);
   assert.match(loginPage, /Accedi/);
+});
+
+test("home page uses backend session helpers", () => {
+  const homePage = read("src/app/page.tsx");
+
+  assert.match(homePage, /getCurrentUser/);
+  assert.match(homePage, /getDashboardSummary/);
+  assert.match(homePage, /Accedi per caricare i dati reali dal backend/);
 });
 
 test("app shell exposes main navigation labels", () => {

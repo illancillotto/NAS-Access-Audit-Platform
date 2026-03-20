@@ -30,3 +30,12 @@ def test_audit_domain_migration_creates_core_tables() -> None:
 
     for table_name in ['"nas_users"', '"nas_groups"', '"shares"', '"reviews"']:
         assert table_name in migration
+
+
+def test_permission_engine_migration_creates_permission_tables() -> None:
+    migration = (
+        ROOT / "backend" / "alembic" / "versions" / "20260320_0004_permission_engine_mvp.py"
+    ).read_text(encoding="utf-8")
+
+    for table_name in ['"permission_entries"', '"effective_permissions"']:
+        assert table_name in migration
