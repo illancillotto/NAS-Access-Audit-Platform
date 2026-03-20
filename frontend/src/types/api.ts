@@ -29,6 +29,13 @@ export type NasUser = {
   last_seen_snapshot_id: number | null;
 };
 
+export type NasGroup = {
+  id: number;
+  name: string;
+  description: string | null;
+  last_seen_snapshot_id: number | null;
+};
+
 export type Share = {
   id: number;
   name: string;

@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ProtectedPage } from "@/components/app/protected-page";
 import { calculatePermissionPreview, getEffectivePermissions } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { useDomainData } from "@/hooks/use-domain-data";
 import type { EffectivePermission, EffectivePermissionPreview } from "@/types/api";
 
 export default function EffectivePermissionsPage() {
@@ -19,6 +20,15 @@ export default function EffectivePermissionsPage() {
   const [subjectName, setSubjectName] = useState("amministrazione");
   const [permissionLevel, setPermissionLevel] = useState("write");
   const [isDeny, setIsDeny] = useState(false);
+  const { users, shares, error: domainError } = useDomainData();
+
+  function getUserLabel(userId: number): string {
+    return users.find((user) => user.id === userId)?.username ?? String(userId);
+  }
+
+  function getShareLabel(shareId: number): string {
+    return shares.find((share) => share.id === shareId)?.name ?? String(shareId);
+  }
 
   useEffect(() => {
     async function loadPermissions() {
@@ -185,7 +195,7 @@ export default function EffectivePermissionsPage() {
         </article>
       </section>
 
-      {error ? <p className="status-note error-text">{error}</p> : null}
+      {error || domainError ? <p className="status-note error-text">{error ?? domainError}</p> : null}
       <table className="data-table">
         <thead>
           <tr>
@@ -200,8 +210,8 @@ export default function EffectivePermissionsPage() {
         <tbody>
           {permissions.map((permission) => (
             <tr key={permission.id}>
-              <td>{permission.nas_user_id}</td>
-              <td>{permission.share_id}</td>
+              <td>{getUserLabel(permission.nas_user_id)}</td>
+              <td>{getShareLabel(permission.share_id)}</td>
               <td>{permission.can_read ? "Si" : "No"}</td>
               <td>{permission.can_write ? "Si" : "No"}</td>
               <td>{permission.is_denied ? "Si" : "No"}</td>

@@ -4,6 +4,7 @@ import type {
   EffectivePermission,
   EffectivePermissionPreview,
   LoginResponse,
+  NasGroup,
   NasUser,
   PermissionEntryInput,
   PermissionUserInput,
@@ -78,6 +79,14 @@ export async function getShares(token: string): Promise<Share[]> {
 
 export async function getNasUsers(token: string): Promise<NasUser[]> {
   return request<NasUser[]>("/nas-users", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getNasGroups(token: string): Promise<NasGroup[]> {
+  return request<NasGroup[]>("/nas-groups", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
