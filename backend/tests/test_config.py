@@ -16,6 +16,8 @@ def test_settings_use_expected_defaults() -> None:
     assert settings.nas_port == 22
     assert settings.nas_username == "svc_naap"
     assert settings.nas_timeout == 10
+    assert settings.bootstrap_admin_username == "admin"
+    assert settings.bootstrap_admin_email == "admin@example.local"
     assert settings.database_url.startswith("postgresql+psycopg://")
 
 
@@ -25,6 +27,7 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
     monkeypatch.setenv("NAS_HOST", "10.10.10.10")
     monkeypatch.setenv("NAS_TIMEOUT", "25")
+    monkeypatch.setenv("BOOTSTRAP_ADMIN_USERNAME", "adminseed")
 
     settings = Settings()
 
@@ -33,3 +36,4 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     assert settings.database_url == "sqlite:///./test.db"
     assert settings.nas_host == "10.10.10.10"
     assert settings.nas_timeout == 25
+    assert settings.bootstrap_admin_username == "adminseed"

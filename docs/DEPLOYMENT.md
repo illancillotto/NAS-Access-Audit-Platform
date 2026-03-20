@@ -33,6 +33,14 @@ In questa fase non sono presenti credenziali applicative bootstrap. L'autenticaz
 - esecuzione manuale: `make migrate`
 - shell backend: `make backend-shell`
 
+## 6.1 Bootstrap Admin
+
+- esecuzione manuale: `make bootstrap-admin`
+- variabili usate:
+  - `BOOTSTRAP_ADMIN_USERNAME`
+  - `BOOTSTRAP_ADMIN_EMAIL`
+  - `BOOTSTRAP_ADMIN_PASSWORD`
+
 ## 7. Log e Troubleshooting
 
 - log stack completo: `make logs`

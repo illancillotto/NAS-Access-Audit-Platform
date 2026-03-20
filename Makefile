@@ -1,6 +1,6 @@
 COMPOSE = docker compose
 
-.PHONY: up down logs rebuild backend-shell frontend-shell migrate
+.PHONY: up down logs rebuild backend-shell frontend-shell migrate bootstrap-admin
 
 up:
 	$(COMPOSE) up -d
@@ -22,3 +22,6 @@ frontend-shell:
 
 migrate:
 	$(COMPOSE) exec backend alembic upgrade head
+
+bootstrap-admin:
+	$(COMPOSE) exec backend python scripts/bootstrap_admin.py

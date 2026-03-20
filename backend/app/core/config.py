@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     nas_password: str = Field(default="change_me", alias="NAS_PASSWORD")
     nas_private_key_path: str | None = Field(default=None, alias="NAS_PRIVATE_KEY_PATH")
     nas_timeout: int = Field(default=10, alias="NAS_TIMEOUT")
+    bootstrap_admin_username: str = Field(default="admin", alias="BOOTSTRAP_ADMIN_USERNAME")
+    bootstrap_admin_email: str = Field(default="admin@example.local", alias="BOOTSTRAP_ADMIN_EMAIL")
+    bootstrap_admin_password: str = Field(default="change_me_admin", alias="BOOTSTRAP_ADMIN_PASSWORD")
 
     model_config = SettingsConfigDict(
         env_file=".env",

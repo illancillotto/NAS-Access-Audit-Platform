@@ -6,7 +6,7 @@
 
 ## Stato Generale
 
-Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora quattro capability backend reali: autenticazione applicativa con JWT, dominio audit minimo in sola lettura, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo. Sul frontend la milestone applicativa e in avanzamento concreto: login reale, stato sessione, dashboard collegata, vista utenti NAS e prime viste backend-driven principali.
+Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora cinque capability backend reali: autenticazione applicativa con JWT, bootstrap admin idempotente, dominio audit minimo in sola lettura, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo. Sul frontend la milestone applicativa e in avanzamento concreto: login reale, stato sessione, dashboard collegata, viste utenti e gruppi NAS e prime viste backend-driven principali.
 
 ## Completato
 
@@ -30,6 +30,7 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 - modello `ApplicationUser`
 - modelli `NasUser`, `NasGroup`, `Share`, `Review`
 - modelli `PermissionEntry` ed `EffectivePermission`
+- bootstrap admin idempotente via script backend e target Makefile
 - config NAS centralizzata e client skeleton
 - parser iniziali per passwd, group, share listing e ACL
 - servizio di calcolo permessi con regole `deny` e `write implies read`
@@ -44,7 +45,7 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 - layout base in `src/app/layout.tsx`
 - pagina home collegata a `GET /auth/me` e `GET /dashboard/summary`
 - pagina `/login` collegata a `POST /auth/login`
-- viste backend-driven per utenti NAS, share, review, sync ed effective permissions
+- viste backend-driven per utenti NAS, gruppi NAS, share, review, sync ed effective permissions
 - preview frontend del permission engine collegata a `POST /permissions/calculate-preview`
 - struttura `src/` predisposta per crescita modulare
 
@@ -66,7 +67,7 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 ### Backend
 
 - suite `backend/tests`
-- stato corrente: `39 passed`
+- stato corrente: `41 passed`
 
 Copertura attuale:
 
@@ -83,6 +84,7 @@ Copertura attuale:
 - migration permission engine MVP
 - parser NAS e connector skeleton
 - servizio calcolo permessi
+- bootstrap admin service e script
 - scaffold repository e file chiave
 
 ### Frontend
@@ -97,10 +99,10 @@ Copertura attuale:
 - navigazione principale applicativa
 - presenza di viste backend-driven
 - presenza della preview permission engine
+- mapping frontend piu leggibile tra id e nomi di dominio
 
 ## Gap Attuali
 
-- auth applicativa presente ma senza bootstrap admin
 - dominio audit minimo presente ma senza sync reale persistente
 - integrazione NAS solo a livello skeleton, senza SSH live
 - permission engine presente ma non ancora alimentato da sync persistente
@@ -119,6 +121,7 @@ Copertura attuale:
 - dominio audit minimo esposto con API protette e testato end-to-end
 - skeleton NAS gia testabile senza dipendere da un host reale
 - permission engine MVP gia calcolabile e testato
+- bootstrap admin disponibile per sbloccare subito l'uso del frontend reale
 - frontend non e piu solo statico: login, sessione, utenti NAS e prime viste reali sono attivi
 - test iniziali gia utili per evitare regressioni di scaffold
 
@@ -131,10 +134,10 @@ Copertura attuale:
 
 ## Prossimi Passi Raccomandati
 
-1. completare il frontend applicativo con mapping piu ricchi e UX piu vicina al dominio
+1. completare il frontend applicativo con UX piu vicina al dominio e dati seed piu utili
 2. introdurre sync reale persistente dal NAS
 3. collegare il permission engine ai dati persistiti
-4. aggiungere bootstrap admin o seed iniziale gestito
+4. aggiungere seed iniziale gestito per dominio audit minimo
 5. ampliare CI con test build/run piu vicini al runtime reale
 6. aggiungere smoke check compose e runtime integrati
 

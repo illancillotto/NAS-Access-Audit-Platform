@@ -82,6 +82,7 @@ Avanzamento attuale:
 - dashboard collegata al backend completata
 - viste reali disponibili per utenti NAS, share, review, sync ed effective permissions
 - preview frontend del permission engine disponibile
+- bootstrap admin disponibile per sbloccare il login reale senza seed manuale
 
 ## Milestone 6. Hardening e Runtime
 

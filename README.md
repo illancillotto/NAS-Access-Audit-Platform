@@ -98,3 +98,4 @@ Bootstrap iniziale completato per sviluppo incrementale:
 - `make backend-shell`: shell nel container backend
 - `make frontend-shell`: shell nel container frontend
 - `make migrate`: esecuzione migrazioni Alembic
+- `make bootstrap-admin`: crea o verifica l'admin iniziale applicativo
