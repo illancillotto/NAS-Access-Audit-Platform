@@ -2,7 +2,11 @@ import type {
   CurrentUser,
   DashboardSummary,
   EffectivePermission,
+  EffectivePermissionPreview,
   LoginResponse,
+  NasUser,
+  PermissionEntryInput,
+  PermissionUserInput,
   Review,
   Share,
   SyncCapabilities,
@@ -72,6 +76,14 @@ export async function getShares(token: string): Promise<Share[]> {
   });
 }
 
+export async function getNasUsers(token: string): Promise<NasUser[]> {
+  return request<NasUser[]>("/nas-users", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function getReviews(token: string): Promise<Review[]> {
   return request<Review[]>("/reviews", {
     headers: {
@@ -93,5 +105,22 @@ export async function getEffectivePermissions(token: string): Promise<EffectiveP
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function calculatePermissionPreview(
+  token: string,
+  users: PermissionUserInput[],
+  permissionEntries: PermissionEntryInput[],
+): Promise<EffectivePermissionPreview[]> {
+  return request<EffectivePermissionPreview[]>("/permissions/calculate-preview", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      users,
+      permission_entries: permissionEntries,
+    }),
   });
 }

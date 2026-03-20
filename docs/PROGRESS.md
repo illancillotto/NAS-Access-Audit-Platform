@@ -6,7 +6,7 @@
 
 ## Stato Generale
 
-Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora quattro capability backend reali: autenticazione applicativa con JWT, dominio audit minimo in sola lettura, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo. Sul frontend e partita la milestone applicativa con login reale, stato sessione e prime viste collegate al backend.
+Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora quattro capability backend reali: autenticazione applicativa con JWT, dominio audit minimo in sola lettura, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo. Sul frontend la milestone applicativa e in avanzamento concreto: login reale, stato sessione, dashboard collegata, vista utenti NAS e prime viste backend-driven principali.
 
 ## Completato
 
@@ -44,7 +44,8 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 - layout base in `src/app/layout.tsx`
 - pagina home collegata a `GET /auth/me` e `GET /dashboard/summary`
 - pagina `/login` collegata a `POST /auth/login`
-- viste backend-driven per share, review, sync ed effective permissions
+- viste backend-driven per utenti NAS, share, review, sync ed effective permissions
+- preview frontend del permission engine collegata a `POST /permissions/calculate-preview`
 - struttura `src/` predisposta per crescita modulare
 
 ### DevOps
@@ -95,6 +96,7 @@ Copertura attuale:
 - integrazione login e dashboard
 - navigazione principale applicativa
 - presenza di viste backend-driven
+- presenza della preview permission engine
 
 ## Gap Attuali
 
@@ -102,7 +104,7 @@ Copertura attuale:
 - dominio audit minimo presente ma senza sync reale persistente
 - integrazione NAS solo a livello skeleton, senza SSH live
 - permission engine presente ma non ancora alimentato da sync persistente
-- frontend collegato solo a una parte delle API backend
+- frontend collegato a molte API di lettura ma non ancora completo sul dominio
 - nessun test di build frontend completo
 - nessun test di esecuzione compose/nginx
 
@@ -117,7 +119,7 @@ Copertura attuale:
 - dominio audit minimo esposto con API protette e testato end-to-end
 - skeleton NAS gia testabile senza dipendere da un host reale
 - permission engine MVP gia calcolabile e testato
-- frontend non e piu solo statico: login, sessione e prime viste reali sono attivi
+- frontend non e piu solo statico: login, sessione, utenti NAS e prime viste reali sono attivi
 - test iniziali gia utili per evitare regressioni di scaffold
 
 ### Punti da Rafforzare Subito
@@ -129,7 +131,7 @@ Copertura attuale:
 
 ## Prossimi Passi Raccomandati
 
-1. completare il frontend applicativo con viste utenti e preview permission engine
+1. completare il frontend applicativo con mapping piu ricchi e UX piu vicina al dominio
 2. introdurre sync reale persistente dal NAS
 3. collegare il permission engine ai dati persistiti
 4. aggiungere bootstrap admin o seed iniziale gestito

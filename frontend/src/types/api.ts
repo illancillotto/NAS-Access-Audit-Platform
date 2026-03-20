@@ -19,6 +19,16 @@ export type DashboardSummary = {
   snapshots: number;
 };
 
+export type NasUser = {
+  id: number;
+  username: string;
+  full_name: string | null;
+  email: string | null;
+  source_uid: string | null;
+  is_active: boolean;
+  last_seen_snapshot_id: number | null;
+};
+
 export type Share = {
   id: number;
   name: string;
@@ -52,6 +62,28 @@ export type EffectivePermission = {
   snapshot_id: number | null;
   nas_user_id: number;
   share_id: number;
+  can_read: boolean;
+  can_write: boolean;
+  is_denied: boolean;
+  source_summary: string;
+};
+
+export type PermissionUserInput = {
+  username: string;
+  groups: string[];
+};
+
+export type PermissionEntryInput = {
+  share_name: string;
+  subject_type: string;
+  subject_name: string;
+  permission_level: string;
+  is_deny: boolean;
+};
+
+export type EffectivePermissionPreview = {
+  username: string;
+  share_name: string;
   can_read: boolean;
   can_write: boolean;
   is_denied: boolean;

@@ -76,6 +76,13 @@ Stato:
 
 - in progress
 
+Avanzamento attuale:
+
+- login reale completato
+- dashboard collegata al backend completata
+- viste reali disponibili per utenti NAS, share, review, sync ed effective permissions
+- preview frontend del permission engine disponibile
+
 ## Milestone 6. Hardening e Runtime
 
 - smoke test compose e health integrati

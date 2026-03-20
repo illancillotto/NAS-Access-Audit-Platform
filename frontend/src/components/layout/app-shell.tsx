@@ -28,6 +28,7 @@ export function AppShell({ children, currentUser, onLogout }: AppShellProps) {
         <nav>
           <Link href="/">Dashboard</Link>
           <Link href="/login">Login</Link>
+          <Link href="/users">Utenti</Link>
           <Link href="/shares">Share</Link>
           <Link href="/reviews">Review</Link>
           <Link href="/sync">Sync</Link>
