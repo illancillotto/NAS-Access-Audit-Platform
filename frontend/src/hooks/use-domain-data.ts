@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-import { getNasUsers, getShares } from "@/lib/api";
+import { getNasGroups, getNasUsers, getShares } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
-import type { NasUser, Share } from "@/types/api";
+import type { NasGroup, NasUser, Share } from "@/types/api";
 
 type DomainDataState = {
   users: NasUser[];
+  groups: NasGroup[];
   shares: Share[];
   error: string | null;
 };
@@ -15,6 +16,7 @@ type DomainDataState = {
 export function useDomainData() {
   const [state, setState] = useState<DomainDataState>({
     users: [],
+    groups: [],
     shares: [],
     error: null,
   });
@@ -25,9 +27,14 @@ export function useDomainData() {
       if (!token) return;
 
       try {
-        const [users, shares] = await Promise.all([getNasUsers(token), getShares(token)]);
+        const [users, groups, shares] = await Promise.all([
+          getNasUsers(token),
+          getNasGroups(token),
+          getShares(token),
+        ]);
         setState({
           users,
+          groups,
           shares,
           error: null,
         });
