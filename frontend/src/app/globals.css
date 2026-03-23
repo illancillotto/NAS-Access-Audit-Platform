@@ -224,6 +224,16 @@ a {
   resize: vertical;
 }
 
+.text-input,
+.select-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
 .button {
   border: 0;
   border-radius: 12px;
@@ -263,6 +273,29 @@ a {
 .form-grid label {
   display: grid;
   gap: 6px;
+  font-weight: 600;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.filter-grid label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.filter-grid-compact {
+  grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 600;
 }
 
@@ -315,6 +348,20 @@ a {
   color: #8d2d2d;
 }
 
+.entity-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.entity-cell strong {
+  font-size: 0.98rem;
+}
+
+.entity-cell span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -326,5 +373,9 @@ a {
 
   .content {
     padding-top: 16px;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
   }
 }

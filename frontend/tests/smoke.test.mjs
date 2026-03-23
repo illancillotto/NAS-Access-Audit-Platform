@@ -80,13 +80,24 @@ test("frontend contains real backend-driven pages", () => {
   const permissionsPage = read("src/app/effective-permissions/page.tsx");
 
   assert.match(usersPage, /getNasUsers/);
+  assert.match(usersPage, /useDeferredValue/);
+  assert.match(usersPage, /Filtri/);
+  assert.match(usersPage, /Solo attivi/);
+  assert.match(usersPage, /Con email/);
   assert.match(groupsPage, /getNasGroups/);
+  assert.match(groupsPage, /useDeferredValue/);
+  assert.match(groupsPage, /Con snapshot/);
+  assert.match(groupsPage, /Senza snapshot/);
   assert.match(sharesPage, /getShares/);
+  assert.match(sharesPage, /useDeferredValue/);
+  assert.match(sharesPage, /Con settore/);
+  assert.match(sharesPage, /Senza settore/);
   assert.match(reviewsPage, /getReviews/);
+  assert.match(reviewsPage, /useDeferredValue/);
+  assert.match(reviewsPage, /Decisione/);
+  assert.match(reviewsPage, /Revoked/);
   assert.match(syncPage, /getSyncCapabilities/);
   assert.match(syncPage, /getSyncRuns/);
-  assert.match(syncPage, /previewSync/);
-  assert.match(syncPage, /applySync/);
   assert.match(syncPage, /applyLiveSync/);
   assert.match(syncPage, /auth_mode/);
   assert.match(syncPage, /retry_strategy/);
@@ -95,8 +106,15 @@ test("frontend contains real backend-driven pages", () => {
   assert.match(syncPage, /Refresh/);
   assert.match(syncPage, /Retry/);
   assert.match(syncPage, /jitter/);
+  assert.match(syncPage, /Esegui Sync NAS/);
+  assert.doesNotMatch(syncPage, /Preview Sync/);
+  assert.doesNotMatch(syncPage, /Apply Sync/);
   assert.match(permissionsPage, /getEffectivePermissions/);
   assert.match(permissionsPage, /calculatePermissionPreview/);
+  assert.match(permissionsPage, /useDeferredValue/);
+  assert.match(permissionsPage, /Con write/);
+  assert.match(permissionsPage, /Solo deny/);
+  assert.match(permissionsPage, /Preview Permission Engine/);
   assert.match(read("src/components/app/protected-page.tsx"), /router\.replace\("\/login"\)/);
 });
 
