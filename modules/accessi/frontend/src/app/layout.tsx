@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NAS Access Audit Platform",
-  description: "Piattaforma interna per audit e review accessi NAS",
+  title: "GAIA | Gestione Apparati Informativi e Accessi",
+  description: "Piattaforma IT governance del Consorzio di Bonifica dell'Oristanese",
 };
 
 export default function RootLayout({

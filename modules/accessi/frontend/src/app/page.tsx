@@ -144,7 +144,7 @@ export default function HomePage() {
               GAIA
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-              Gestione Accessi Inventario e Apparati
+              Gestione Apparati Informativi e Accessi
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70 sm:text-base">
               Piattaforma IT governance del Consorzio di Bonifica dell&apos;Oristanese. Un unico punto di ingresso

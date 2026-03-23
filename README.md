@@ -1,5 +1,5 @@
 # GAIA
-## Gestione Accessi Inventario e Apparati
+## Gestione Apparati Informativi e Accessi
 ### Piattaforma IT governance — Consorzio di Bonifica dell'Oristanese
 
 ## Cos'è GAIA

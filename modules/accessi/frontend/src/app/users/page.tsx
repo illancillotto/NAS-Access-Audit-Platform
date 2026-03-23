@@ -5,6 +5,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { UserDetailPanel } from "@/components/app/user-detail-panel";
 import { DataTable } from "@/components/table/data-table";
 import { TableFilters } from "@/components/table/table-filters";
 import { Avatar } from "@/components/ui/avatar";
@@ -34,10 +35,29 @@ export default function UsersPage() {
   const [users, setUsers] = useState<NasUser[]>([]);
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
+
+  useEffect(() => {
+    if (selectedUserId == null) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedUserId(null);
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [selectedUserId]);
 
   useEffect(() => {
     async function loadUsers() {
@@ -113,13 +133,17 @@ export default function UsersPage() {
         header: "Utente NAS",
         accessorKey: "username",
         cell: ({ row }) => (
-          <Link href={`/users/${row.original.id}`} className="flex items-center gap-3">
+          <button
+            className="flex items-center gap-3 text-left"
+            onClick={() => setSelectedUserId(row.original.id)}
+            type="button"
+          >
             <Avatar label={row.original.fullName === "Nome non disponibile" ? row.original.username : row.original.fullName} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-900">{row.original.username}</p>
+              <p className="truncate text-sm font-medium text-[#1D4E35]">{row.original.username}</p>
               <p className="truncate text-xs text-gray-400">{row.original.fullName}</p>
             </div>
-          </Link>
+          </button>
         ),
       },
       {
@@ -150,9 +174,13 @@ export default function UsersPage() {
         header: "Azione",
         accessorKey: "id",
         cell: ({ row }) => (
-          <Link className="text-sm font-medium text-[#1D4E35]" href={`/users/${row.original.id}`}>
-            Apri
-          </Link>
+          <button
+            className="text-sm font-medium text-[#1D4E35]"
+            onClick={() => setSelectedUserId(row.original.id)}
+            type="button"
+          >
+            Apri dettaglio
+          </button>
         ),
       },
     ],
@@ -208,7 +236,7 @@ export default function UsersPage() {
       <article className="panel-card overflow-hidden p-0">
         <div className="border-b border-gray-100 px-5 py-4">
           <p className="section-title">Utenti sincronizzati</p>
-          <p className="section-copy">La riga collega al dettaglio utente con permessi, review e attività.</p>
+          <p className="section-copy">La riga apre il dettaglio utente in modal con permessi, review e attività.</p>
         </div>
         <DataTable
           data={filteredRows}
@@ -217,6 +245,35 @@ export default function UsersPage() {
           emptyDescription="Nessun utente corrisponde ai filtri selezionati."
         />
       </article>
+
+      {selectedUserId != null ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#0E1712]/50 p-4 backdrop-blur-sm md:p-8">
+          <button
+            aria-label="Chiudi dettaglio utente"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setSelectedUserId(null)}
+            type="button"
+          />
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-gray-200 bg-[#F6F7F2] p-4 shadow-[0_30px_80px_rgba(15,25,19,0.18)] md:max-h-[calc(100vh-4rem)] md:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Dettaglio utente</p>
+                <h3 className="mt-1 text-xl font-medium text-gray-900">Vista rapida operativa</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link className="text-sm font-medium text-[#1D4E35]" href={`/users/${selectedUserId}`}>
+                  Apri pagina completa
+                </Link>
+                <button className="btn-secondary" onClick={() => setSelectedUserId(null)} type="button">
+                  Chiudi
+                </button>
+              </div>
+            </div>
+
+            <UserDetailPanel userId={selectedUserId} compact onClose={() => setSelectedUserId(null)} />
+          </div>
+        </div>
+      ) : null}
     </ProtectedPage>
   );
 }

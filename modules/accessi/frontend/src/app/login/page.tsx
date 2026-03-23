@@ -122,7 +122,7 @@ export default function LoginPage() {
               <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-white/45">Identità</p>
                 <p className="mt-2 text-sm leading-6 text-white/76">
-                  Gestione Accessi, Inventario e Apparati in un’unica piattaforma IT governance.
+                  Gestione Apparati Informativi e Accessi in un’unica piattaforma IT governance.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
