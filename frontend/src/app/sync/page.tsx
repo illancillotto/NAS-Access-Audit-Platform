@@ -37,25 +37,25 @@ export default function SyncPage() {
   const [aclTexts, setAclTexts] = useState(sampleAclTexts.join("\n---\n"));
 
   useEffect(() => {
-    async function loadCapabilities() {
-      const token = getStoredAccessToken();
-      if (!token) return;
-
-      try {
-        const [capabilitiesResult, syncRunsResult] = await Promise.all([
-          getSyncCapabilities(token),
-          getSyncRuns(token),
-        ]);
-        setCapabilities(capabilitiesResult);
-        setSyncRuns(syncRunsResult);
-        setError(null);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Errore caricamento sync");
-      }
-    }
-
-    void loadCapabilities();
+    void loadSyncContext();
   }, []);
+
+  async function loadSyncContext(): Promise<void> {
+    const token = getStoredAccessToken();
+    if (!token) return;
+
+    try {
+      const [capabilitiesResult, syncRunsResult] = await Promise.all([
+        getSyncCapabilities(token),
+        getSyncRuns(token),
+      ]);
+      setCapabilities(capabilitiesResult);
+      setSyncRuns(syncRunsResult);
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Errore caricamento sync");
+    }
+  }
 
   function buildPayload() {
     return {
@@ -131,34 +131,42 @@ export default function SyncPage() {
     >
       {error ? <p className="status-note error-text">{error}</p> : null}
       {capabilities ? (
-        <table className="data-table">
-          <tbody>
-            <tr>
-              <th>Host</th>
-              <td>{capabilities.host}</td>
-            </tr>
-            <tr>
-              <th>Porta</th>
-              <td>{capabilities.port}</td>
-            </tr>
-            <tr>
-              <th>Username</th>
-              <td>{capabilities.username}</td>
-            </tr>
-            <tr>
-              <th>SSH configurato</th>
-              <td>{capabilities.ssh_configured ? "Si" : "No"}</td>
-            </tr>
-            <tr>
-              <th>Live sync</th>
-              <td>{capabilities.supports_live_sync ? "Attivo" : "Non ancora implementato"}</td>
-            </tr>
-            <tr>
-              <th>Auth mode</th>
-              <td>{capabilities.auth_mode}</td>
-            </tr>
-          </tbody>
-        </table>
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Capability Connector</h3>
+              <p className="status-note">
+                Host <span className="mono">{capabilities.host}</span>, autenticazione <span className="mono">{capabilities.auth_mode}</span>, retry <span className="mono">{capabilities.retry_strategy}</span>.
+              </p>
+            </div>
+            <button className="button button-secondary-light" type="button" onClick={() => void loadSyncContext()}>
+              Refresh
+            </button>
+          </div>
+          <div className="panel-grid">
+            <article className="panel">
+              <small>SSH</small>
+              <div className={`status-pill ${capabilities.ssh_configured ? "status-ok" : "status-warn"}`}>
+                {capabilities.ssh_configured ? "Configurato" : "Assente"}
+              </div>
+              <p>{capabilities.username}@{capabilities.host}:{capabilities.port}</p>
+            </article>
+            <article className="panel">
+              <small>Live Sync</small>
+              <div className={`status-pill ${capabilities.supports_live_sync ? "status-ok" : "status-warn"}`}>
+                {capabilities.supports_live_sync ? "Attivo" : "Disabilitato"}
+              </div>
+              <p>Timeout {capabilities.timeout_seconds}s</p>
+            </article>
+            <article className="panel">
+              <small>Retry</small>
+              <div className="metric metric-compact">{capabilities.retry_max_attempts}</div>
+              <p>
+                base {capabilities.retry_base_delay_seconds}s, max {capabilities.retry_max_delay_seconds}s
+              </p>
+            </article>
+          </div>
+        </article>
       ) : (
         <p className="status-note">Nessuna capability disponibile.</p>
       )}
@@ -268,7 +276,13 @@ export default function SyncPage() {
 
       {syncRuns.length > 0 ? (
         <article className="panel">
-          <h3>Storico Sync</h3>
+          <div className="panel-header">
+            <div>
+              <h3>Storico Sync</h3>
+              <p className="status-note">Ultime esecuzioni ordinate per completamento.</p>
+            </div>
+            <div className="badge">Totale run: {syncRuns.length}</div>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
@@ -281,6 +295,7 @@ export default function SyncPage() {
                 <th>Tentativi</th>
                 <th>Durata</th>
                 <th>Snapshot</th>
+                <th>Fine</th>
               </tr>
             </thead>
             <tbody>
@@ -291,10 +306,15 @@ export default function SyncPage() {
                   <td>{syncRun.trigger_type}</td>
                   <td>{syncRun.source_label ?? "-"}</td>
                   <td>{syncRun.initiated_by ?? "-"}</td>
-                  <td>{syncRun.status}</td>
+                  <td>
+                    <span className={`status-pill ${syncRun.status === "succeeded" ? "status-ok" : "status-warn"}`}>
+                      {syncRun.status}
+                    </span>
+                  </td>
                   <td>{syncRun.attempts_used}</td>
                   <td className="mono">{syncRun.duration_ms ?? "-"} ms</td>
                   <td className="mono">{syncRun.snapshot_id ?? "-"}</td>
+                  <td className="mono">{syncRun.completed_at ?? "-"}</td>
                 </tr>
               ))}
             </tbody>

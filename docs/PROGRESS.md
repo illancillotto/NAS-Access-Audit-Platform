@@ -6,7 +6,7 @@
 
 ## Stato Generale
 
-Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora undici capability backend reali: autenticazione applicativa con JWT, bootstrap admin idempotente, bootstrap dominio audit idempotente, dominio audit minimo in sola lettura, sync persistente minimale da payload testuale, live apply singolo via SSH, job/script di live sync con retry controllato, audit trail persistente delle sync, metadata operativi sui sync run, scheduling operativo minimale, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo. Sul frontend la milestone applicativa e in avanzamento concreto: login reale, stato sessione, dashboard collegata, viste utenti e gruppi NAS e prime viste backend-driven principali, inclusa la pagina `Sync` operativa con storico run esteso.
+Il repository e in una fase di bootstrap avanzato: la base documentale, il backend, il frontend, il setup Docker e la CI minima sono presenti e coerenti. Il progetto ha ora dodici capability backend reali: autenticazione applicativa con JWT, bootstrap admin idempotente, bootstrap dominio audit idempotente, dominio audit minimo in sola lettura, sync persistente minimale da payload testuale, live apply singolo via SSH, job/script di live sync con retry controllato, audit trail persistente delle sync, metadata operativi sui sync run, scheduling operativo minimale, backoff configurabile dei retry, skeleton di integrazione NAS con parser iniziali e permission engine MVP con preview di calcolo. Sul frontend la milestone applicativa e in avanzamento concreto: login reale, stato sessione, dashboard collegata, viste utenti e gruppi NAS e prime viste backend-driven principali, inclusa la pagina `Sync` operativa con storico run esteso.
 
 ## Completato
 
@@ -45,6 +45,7 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 - modello persistente `sync_runs` con migration dedicata
 - metadata `duration_ms`, `initiated_by`, `source_label` sui sync run
 - runner schedulato configurabile via env e script dedicato
+- backoff retry configurabile `fixed` o `exponential`
 - struttura Alembic presente con migration iniziale `snapshots`
 - seconda migration per `application_users`
 - terza migration per il dominio audit minimo
@@ -84,7 +85,7 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 ### Backend
 
 - suite `backend/tests`
-- stato corrente: `56 passed`
+- stato corrente: `59 passed`
 
 Verifica runtime:
 
@@ -99,6 +100,7 @@ Verifica runtime:
 - `POST /sync/apply` verificato con creazione record audit in `sync_runs`
 - `GET /sync-runs` verificato contro stack locale
 - `python scripts/scheduled_live_sync.py` verificato con ciclo singolo e record audit completo
+- backoff retry verificato con test unitari su modalita `fixed`, `exponential` e cap massimo
 - login reale verificato su `POST /auth/login`
 - query reali verificate su `/dashboard/summary`, `/nas-users`, `/nas-groups`, `/shares`, `/reviews`, `/effective-permissions`
 
@@ -112,6 +114,7 @@ Copertura attuale:
 - job di live sync con retry testato
 - audit trail sync persistente esposto via API
 - metadata e scheduling operativo minimale verificati
+- policy di backoff verificata
 - permission preview e lista effective permissions
 - metadata applicazione FastAPI
 - settings e override ambiente
@@ -175,6 +178,7 @@ Copertura attuale:
 - il progetto espone gia un entrypoint operativo `make live-sync` per esecuzione manuale o schedulata
 - le sync applicate sono ora tracciate in modo persistente con esito e tentativi
 - il progetto espone anche un runner schedulato configurabile per la live sync
+- il retry della live sync non e piu a pausa fissa: supporta backoff configurabile
 - stack Docker del progetto verificato end-to-end in ambiente locale
 - test iniziali gia utili per evitare regressioni di scaffold
 
@@ -188,7 +192,7 @@ Copertura attuale:
 ## Prossimi Passi Raccomandati
 
 1. verificare la live sync contro un host NAS reale o staging
-2. introdurre persistenza dello scheduler e policy piu evolute di retry/backoff
+2. introdurre persistenza dello scheduler e, se serve, jitter/randomizzazione del backoff
 3. completare il frontend applicativo con UX piu vicina al dominio operativo
 4. ampliare CI con test build/run piu vicini al runtime reale
 5. verificare la live sync contro un NAS reale o staging

@@ -109,3 +109,11 @@ Bootstrap iniziale completato per sviluppo incrementale:
 - `make bootstrap-domain`: popola dati seed iniziali per il dominio audit
 - `make live-sync`: esegue una live sync via SSH con retry controllato
 - `make scheduled-live-sync`: avvia il runner schedulato della live sync
+
+Parametri operativi principali per retry/backoff:
+
+- `SYNC_LIVE_MAX_ATTEMPTS`
+- `SYNC_LIVE_RETRY_DELAY_SECONDS`
+- `SYNC_LIVE_BACKOFF_MODE`
+- `SYNC_LIVE_BACKOFF_MULTIPLIER`
+- `SYNC_LIVE_BACKOFF_MAX_DELAY_SECONDS`

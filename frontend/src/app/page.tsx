@@ -99,7 +99,13 @@ export default function HomePage() {
             <p className="status-note">
               Vai alla <Link href="/login">pagina di login</Link> per usare il backend reale.
             </p>
-          ) : null}
+          ) : (
+            <div className="action-row">
+              <Link className="button" href="/sync">Apri Sync</Link>
+              <Link className="button button-secondary-light" href="/effective-permissions">Apri Permessi</Link>
+              <Link className="button button-secondary-light" href="/users">Apri Utenti</Link>
+            </div>
+          )}
         </article>
 
         <section className="panel-grid">

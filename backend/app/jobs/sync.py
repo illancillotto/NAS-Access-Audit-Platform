@@ -18,6 +18,15 @@ class LiveSyncJobResult:
     sync_result: SyncApplyResponse
 
 
+def compute_retry_delay(attempt: int) -> float:
+    base_delay = float(settings.sync_live_retry_delay_seconds)
+    if settings.sync_live_backoff_mode == "exponential":
+        delay = base_delay * (settings.sync_live_backoff_multiplier ** max(attempt - 1, 0))
+    else:
+        delay = base_delay
+    return min(delay, float(settings.sync_live_backoff_max_delay_seconds))
+
+
 def run_scheduled_live_sync_cycle(
     db: Session,
     client: NasSSHClient | None = None,
@@ -66,7 +75,7 @@ def run_live_sync_job(
             last_error = exc
             if attempt >= settings.sync_live_max_attempts:
                 break
-            sleep_fn(settings.sync_live_retry_delay_seconds)
+            sleep_fn(compute_retry_delay(attempt))
 
     assert last_error is not None
     create_sync_run(

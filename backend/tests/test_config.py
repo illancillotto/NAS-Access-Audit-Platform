@@ -22,6 +22,9 @@ def test_settings_use_expected_defaults() -> None:
     assert settings.nas_acl_command_template == "synoacltool -get /volume1/{share}"
     assert settings.sync_live_max_attempts == 3
     assert settings.sync_live_retry_delay_seconds == 2
+    assert settings.sync_live_backoff_mode == "fixed"
+    assert settings.sync_live_backoff_multiplier == 2.0
+    assert settings.sync_live_backoff_max_delay_seconds == 30
     assert settings.sync_schedule_enabled is False
     assert settings.sync_schedule_interval_seconds == 900
     assert settings.sync_schedule_max_cycles == 0
@@ -38,6 +41,8 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     monkeypatch.setenv("NAS_TIMEOUT", "25")
     monkeypatch.setenv("NAS_SHARES_COMMAND", "ls /shares")
     monkeypatch.setenv("SYNC_LIVE_MAX_ATTEMPTS", "5")
+    monkeypatch.setenv("SYNC_LIVE_BACKOFF_MODE", "exponential")
+    monkeypatch.setenv("SYNC_LIVE_BACKOFF_MULTIPLIER", "3")
     monkeypatch.setenv("SYNC_SCHEDULE_ENABLED", "true")
     monkeypatch.setenv("SYNC_SCHEDULE_INTERVAL_SECONDS", "60")
     monkeypatch.setenv("BOOTSTRAP_ADMIN_USERNAME", "adminseed")
@@ -51,6 +56,8 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     assert settings.nas_timeout == 25
     assert settings.nas_shares_command == "ls /shares"
     assert settings.sync_live_max_attempts == 5
+    assert settings.sync_live_backoff_mode == "exponential"
+    assert settings.sync_live_backoff_multiplier == 3
     assert settings.sync_schedule_enabled is True
     assert settings.sync_schedule_interval_seconds == 60
     assert settings.bootstrap_admin_username == "adminseed"

@@ -82,4 +82,8 @@ def get_sync_capabilities() -> SyncCapabilitiesResponse:
         timeout_seconds=settings.nas_timeout,
         supports_live_sync=supports_live_sync,
         auth_mode=auth_mode,
+        retry_strategy=settings.sync_live_backoff_mode,
+        retry_max_attempts=settings.sync_live_max_attempts,
+        retry_base_delay_seconds=settings.sync_live_retry_delay_seconds,
+        retry_max_delay_seconds=settings.sync_live_backoff_max_delay_seconds,
     )

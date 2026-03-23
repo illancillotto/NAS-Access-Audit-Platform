@@ -9,6 +9,10 @@ class SyncCapabilitiesResponse(BaseModel):
     timeout_seconds: int
     supports_live_sync: bool
     auth_mode: str
+    retry_strategy: str
+    retry_max_attempts: int
+    retry_base_delay_seconds: int
+    retry_max_delay_seconds: int
 
 
 class SyncPreviewRequest(BaseModel):

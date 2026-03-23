@@ -12,6 +12,7 @@ def test_get_sync_capabilities_reflects_password_auth(monkeypatch) -> None:
     assert capabilities.ssh_configured is True
     assert capabilities.supports_live_sync is True
     assert capabilities.auth_mode == "password"
+    assert capabilities.retry_strategy == "fixed"
 
 
 def test_get_sync_capabilities_reflects_private_key_auth(monkeypatch) -> None:

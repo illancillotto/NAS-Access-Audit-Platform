@@ -89,6 +89,7 @@ Avanzamento attuale:
 - job/script di live sync con retry controllato disponibile
 - audit trail persistente delle sync disponibile e visibile in UI/API
 - runner schedulato della live sync disponibile con loop configurabile
+- backoff configurabile per i retry della live sync disponibile
 
 ## Milestone 6. Hardening e Runtime
 
@@ -101,6 +102,7 @@ Avanzamento attuale:
 - retry operativo per live sync
 - tracciamento persistente degli esiti di sync
 - scheduling operativo minimale via script
+- backoff `fixed` o `exponential` configurabile
 - affinamento deployment e note operative
 
 ## Ordine di Esecuzione Corrente

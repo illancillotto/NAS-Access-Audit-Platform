@@ -30,6 +30,7 @@ test("home page contains dashboard bootstrap copy", () => {
   assert.match(homePage, /API target: \/api/);
   assert.match(homePage, /Utenti NAS/);
   assert.match(homePage, /Sync Run/);
+  assert.match(homePage, /Apri Sync/);
 });
 
 test("login page contains real access form", () => {
@@ -79,8 +80,11 @@ test("frontend contains real backend-driven pages", () => {
   assert.match(syncPage, /previewSync/);
   assert.match(syncPage, /applySync/);
   assert.match(syncPage, /applyLiveSync/);
-  assert.match(syncPage, /Auth mode/);
+  assert.match(syncPage, /auth_mode/);
+  assert.match(syncPage, /retry_strategy/);
   assert.match(syncPage, /Source/);
+  assert.match(syncPage, /Refresh/);
+  assert.match(syncPage, /Retry/);
   assert.match(permissionsPage, /getEffectivePermissions/);
   assert.match(permissionsPage, /calculatePermissionPreview/);
 });

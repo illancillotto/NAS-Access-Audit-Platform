@@ -64,6 +64,10 @@ export type SyncCapabilities = {
   timeout_seconds: number;
   supports_live_sync: boolean;
   auth_mode: string;
+  retry_strategy: string;
+  retry_max_attempts: number;
+  retry_base_delay_seconds: number;
+  retry_max_delay_seconds: number;
 };
 
 export type SyncPreviewRequest = {

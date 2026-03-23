@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     )
     sync_live_max_attempts: int = Field(default=3, alias="SYNC_LIVE_MAX_ATTEMPTS")
     sync_live_retry_delay_seconds: int = Field(default=2, alias="SYNC_LIVE_RETRY_DELAY_SECONDS")
+    sync_live_backoff_mode: str = Field(default="fixed", alias="SYNC_LIVE_BACKOFF_MODE")
+    sync_live_backoff_multiplier: float = Field(default=2.0, alias="SYNC_LIVE_BACKOFF_MULTIPLIER")
+    sync_live_backoff_max_delay_seconds: int = Field(
+        default=30,
+        alias="SYNC_LIVE_BACKOFF_MAX_DELAY_SECONDS",
+    )
     sync_schedule_enabled: bool = Field(default=False, alias="SYNC_SCHEDULE_ENABLED")
     sync_schedule_interval_seconds: int = Field(default=900, alias="SYNC_SCHEDULE_INTERVAL_SECONDS")
     sync_schedule_max_cycles: int = Field(default=0, alias="SYNC_SCHEDULE_MAX_CYCLES")

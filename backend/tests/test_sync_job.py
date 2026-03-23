@@ -4,7 +4,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.security import hash_password
 from app.db.base import Base
-from app.jobs.sync import run_live_sync_job, run_scheduled_live_sync_cycle
+from app.jobs.sync import compute_retry_delay, run_live_sync_job, run_scheduled_live_sync_cycle
 from app.models.application_user import ApplicationUser, ApplicationUserRole
 from app.models.sync_run import SyncRun
 from app.services.nas_connector import NasConnectorError
@@ -30,9 +30,36 @@ class FlakyNasClient:
         return mapping[command]
 
 
+def test_compute_retry_delay_supports_fixed_and_exponential_modes(monkeypatch) -> None:
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 2)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_multiplier", 2.0)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 30)
+
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
+    assert compute_retry_delay(1) == 2
+    assert compute_retry_delay(3) == 2
+
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "exponential")
+    assert compute_retry_delay(1) == 2
+    assert compute_retry_delay(2) == 4
+    assert compute_retry_delay(3) == 8
+
+
+def test_compute_retry_delay_applies_max_cap(monkeypatch) -> None:
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 5)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "exponential")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_multiplier", 3.0)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 20)
+
+    assert compute_retry_delay(1) == 5
+    assert compute_retry_delay(2) == 15
+    assert compute_retry_delay(3) == 20
+
+
 def test_run_live_sync_job_retries_and_then_succeeds(monkeypatch) -> None:
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 3)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 0)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
@@ -86,6 +113,7 @@ def test_run_live_sync_job_retries_and_then_succeeds(monkeypatch) -> None:
 def test_run_live_sync_job_raises_after_max_attempts(monkeypatch) -> None:
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 2)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 0)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
@@ -137,6 +165,7 @@ def test_run_live_sync_job_raises_after_max_attempts(monkeypatch) -> None:
 def test_run_scheduled_live_sync_cycle_sets_scheduler_metadata(monkeypatch) -> None:
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 1)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 0)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
@@ -176,3 +205,51 @@ def test_run_scheduled_live_sync_cycle_sets_scheduler_metadata(monkeypatch) -> N
     assert sync_run.initiated_by == "system"
     assert sync_run.source_label == "scheduler:ssh"
     assert sync_run.started_at <= sync_run.completed_at
+
+
+def test_run_live_sync_job_uses_exponential_backoff_between_failures(monkeypatch) -> None:
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 3)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 2)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "exponential")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_multiplier", 2.0)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 30)
+    monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
+    monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
+    monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
+    monkeypatch.setattr(
+        "app.services.sync.settings.nas_acl_command_template",
+        "synoacltool -get /volume1/{share}",
+    )
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    sleep_calls: list[float] = []
+    try:
+        db.add(
+            ApplicationUser(
+                username="reviewer",
+                email="reviewer@example.local",
+                password_hash=hash_password("secret123"),
+                role=ApplicationUserRole.ADMIN.value,
+                is_active=True,
+            )
+        )
+        db.commit()
+
+        result = run_live_sync_job(
+            db,
+            client=FlakyNasClient(failures_before_success=2),
+            sleep_fn=lambda seconds: sleep_calls.append(seconds),
+        )
+    finally:
+        db.close()
+
+    assert result.attempts_used == 3
+    assert sleep_calls == [2, 4]
