@@ -12,10 +12,10 @@ import { Avatar } from "@/components/ui/avatar";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PermissionBadge, type PermissionLevel } from "@/components/ui/permission-badge";
 import { Badge } from "@/components/ui/badge";
-import { getEffectivePermissions, getNasUsers } from "@/lib/api";
+import { getEffectivePermissions, getNasGroups, getNasUsers } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { getPermissionLevel } from "@/lib/presentation";
-import type { EffectivePermission, NasUser } from "@/types/api";
+import type { EffectivePermission, NasGroup, NasUser } from "@/types/api";
 
 type ActivityFilter = "all" | "active" | "inactive";
 
@@ -25,6 +25,7 @@ type UserRow = {
   fullName: string;
   sourceUid: string;
   isActive: boolean;
+  groupNames: string[];
   groupSummary: string;
   accessibleShares: number;
   maxPermission: PermissionLevel;
@@ -33,11 +34,13 @@ type UserRow = {
 
 export default function UsersPage() {
   const [users, setUsers] = useState<NasUser[]>([]);
+  const [groups, setGroups] = useState<NasGroup[]>([]);
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [groupFilter, setGroupFilter] = useState("all");
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -65,11 +68,13 @@ export default function UsersPage() {
       if (!token) return;
 
       try {
-        const [userItems, permissionItems] = await Promise.all([
+        const [userItems, groupItems, permissionItems] = await Promise.all([
           getNasUsers(token),
+          getNasGroups(token),
           getEffectivePermissions(token),
         ]);
         setUsers(userItems);
+        setGroups(groupItems);
         setPermissions(permissionItems);
         setError(null);
       } catch (loadError) {
@@ -90,6 +95,14 @@ export default function UsersPage() {
 
     return users.map((user) => {
       const userPermissions = permissionByUser.get(user.id) ?? [];
+      const groupNames = groups
+        .filter((group) =>
+          userPermissions.some((permission) =>
+            permission.source_summary.includes(`group:${group.name}:`),
+          ),
+        )
+        .map((group) => group.name)
+        .sort((left, right) => left.localeCompare(right, "it"));
       const maxPermission = userPermissions.reduce<PermissionLevel>((current, permission) => {
         const level = getPermissionLevel(permission);
         const rank = { none: 0, read: 1, rw: 2, deny: 3 };
@@ -102,7 +115,8 @@ export default function UsersPage() {
         fullName: user.full_name ?? "Nome non disponibile",
         sourceUid: user.source_uid ?? "—",
         isActive: user.is_active,
-        groupSummary: userPermissions.length > 0 ? "Dominio sincronizzato" : "Nessun permesso",
+        groupNames,
+        groupSummary: groupNames.length > 0 ? groupNames.join(", ") : "Nessun gruppo dedotto",
         accessibleShares: new Set(
           userPermissions.filter((permission) => permission.can_read || permission.can_write).map((item) => item.share_id),
         ).size,
@@ -110,7 +124,14 @@ export default function UsersPage() {
         lastSeenSnapshotId: user.last_seen_snapshot_id,
       };
     });
-  }, [users, permissions]);
+  }, [users, groups, permissions]);
+
+  const availableGroupOptions = useMemo(
+    () =>
+      [...new Set(rows.flatMap((row) => row.groupNames))]
+        .sort((left, right) => left.localeCompare(right, "it")),
+    [rows],
+  );
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
@@ -118,6 +139,7 @@ export default function UsersPage() {
     return rows.filter((row) => {
       if (activityFilter === "active" && !row.isActive) return false;
       if (activityFilter === "inactive" && row.isActive) return false;
+      if (groupFilter !== "all" && !row.groupNames.includes(groupFilter)) return false;
 
       if (!normalizedSearch) return true;
 
@@ -125,7 +147,7 @@ export default function UsersPage() {
         value.toLowerCase().includes(normalizedSearch),
       );
     });
-  }, [rows, deferredSearchTerm, activityFilter]);
+  }, [rows, deferredSearchTerm, activityFilter, groupFilter]);
 
   const columns = useMemo<ColumnDef<UserRow>[]>(
     () => [
@@ -205,7 +227,7 @@ export default function UsersPage() {
       <article className="panel-card">
         <div className="mb-4">
           <p className="section-title">Filtri operativi</p>
-          <p className="section-copy">Ricerca su username, nome completo e UID con filtro sullo stato account.</p>
+          <p className="section-copy">Ricerca su username, nome completo e UID con filtro su stato account e gruppi dedotti.</p>
         </div>
         <TableFilters>
           <label className="text-sm font-medium text-gray-700">
@@ -228,6 +250,21 @@ export default function UsersPage() {
               <option value="all">Tutti</option>
               <option value="active">Solo attivi</option>
               <option value="inactive">Solo inattivi</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Gruppo
+            <select
+              className="form-control mt-1"
+              value={groupFilter}
+              onChange={(event) => setGroupFilter(event.target.value)}
+            >
+              <option value="all">Tutti i gruppi</option>
+              {availableGroupOptions.map((groupName) => (
+                <option key={groupName} value={groupName}>
+                  {groupName}
+                </option>
+              ))}
             </select>
           </label>
         </TableFilters>

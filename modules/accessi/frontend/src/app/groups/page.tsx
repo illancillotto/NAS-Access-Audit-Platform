@@ -10,15 +10,66 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { getNasGroups } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { cn } from "@/lib/cn";
 import type { NasGroup } from "@/types/api";
 
 type SnapshotFilter = "all" | "with-snapshot" | "without-snapshot";
+type GroupScopeFilter = "operational" | "all";
+
+const SYSTEM_GROUP_NAME_PATTERNS = [
+  /^avahi$/i,
+  /^bind$/i,
+  /^daemon$/i,
+  /^dbus$/i,
+  /^dovecot$/i,
+  /^ftp$/i,
+  /^ldap$/i,
+  /^log$/i,
+  /^lp$/i,
+  /^maildrop$/i,
+  /^mysql$/i,
+  /^nobody$/i,
+  /^ntp$/i,
+  /^postgres$/i,
+  /^python\d*$/i,
+  /^root$/i,
+  /^rpc$/i,
+  /^smmsp$/i,
+  /^syno/i,
+  /^system$/i,
+  /^taskmgr$/i,
+  /^tokenmgr$/i,
+  /^videodriver$/i,
+  /^vmcomm$/i,
+  /^wheel$/i,
+  /service/i,
+  /quickconnect/i,
+  /storagemanager/i,
+  /oauth/i,
+  /securesignin/i,
+];
+
+function isSystemGroup(group: NasGroup): boolean {
+  const normalizedName = group.name.trim();
+  const normalizedDescription = (group.description ?? "").trim().toLowerCase();
+
+  if (
+    normalizedDescription.startsWith("system default") ||
+    normalizedDescription.includes("default group") ||
+    normalizedDescription.includes("web services")
+  ) {
+    return true;
+  }
+
+  return SYSTEM_GROUP_NAME_PATTERNS.some((pattern) => pattern.test(normalizedName));
+}
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<NasGroup[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [snapshotFilter, setSnapshotFilter] = useState<SnapshotFilter>("all");
+  const [scopeFilter, setScopeFilter] = useState<GroupScopeFilter>("operational");
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -45,6 +96,7 @@ export default function GroupsPage() {
       .filter((group) => {
         if (snapshotFilter === "with-snapshot" && group.last_seen_snapshot_id == null) return false;
         if (snapshotFilter === "without-snapshot" && group.last_seen_snapshot_id != null) return false;
+        if (scopeFilter === "operational" && isSystemGroup(group)) return false;
 
         if (!normalizedSearch) return true;
 
@@ -53,27 +105,34 @@ export default function GroupsPage() {
         );
       })
       .sort((left, right) => left.name.localeCompare(right.name, "it"));
-  }, [groups, deferredSearchTerm, snapshotFilter]);
+  }, [groups, deferredSearchTerm, snapshotFilter, scopeFilter]);
+
+  const systemGroupCount = useMemo(
+    () => groups.filter((group) => isSystemGroup(group)).length,
+    [groups],
+  );
+  const operationalGroupCount = groups.length - systemGroupCount;
 
   return (
     <ProtectedPage
       title="Gruppi NAS"
-      description="Vista dei gruppi presenti nel dominio sincronizzato con focus su presenza nel ciclo di snapshot."
+      description="Vista dei gruppi presenti nel dominio sincronizzato con focus operativo sui gruppi utili all’audit."
       breadcrumb="Accessi"
     >
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <div className="surface-grid">
-        <MetricCard label="Gruppi NAS" value={groups.length} sub="Gruppi sincronizzati dal NAS" />
+        <MetricCard label="Gruppi operativi" value={operationalGroupCount} sub="Gruppi rilevanti per audit e dominio" />
+        <MetricCard label="Gruppi di sistema" value={systemGroupCount} sub="Gruppi tecnici o di servizio NAS" variant="warning" />
         <MetricCard label="Con snapshot" value={groups.filter((item) => item.last_seen_snapshot_id != null).length} sub="Visti almeno una volta" />
         <MetricCard label="Con descrizione" value={groups.filter((item) => Boolean(item.description)).length} sub="Gruppi con metadata descrittivi" />
-        <MetricCard label="Senza snapshot" value={groups.filter((item) => item.last_seen_snapshot_id == null).length} sub="Da verificare nei cicli sync" variant="warning" />
+        <MetricCard label="Senza snapshot" value={groups.filter((item) => item.last_seen_snapshot_id == null).length} sub="Da verificare nei cicli sync" />
       </div>
 
       <article className="panel-card">
         <div className="mb-4">
           <p className="section-title">Filtri</p>
-          <p className="section-copy">Ricerca su nome e descrizione del gruppo con filtro snapshot.</p>
+          <p className="section-copy">Ricerca su nome e descrizione con filtro snapshot e separazione tra gruppi operativi e tecnici.</p>
         </div>
         <TableFilters>
           <label className="text-sm font-medium text-gray-700">
@@ -98,6 +157,17 @@ export default function GroupsPage() {
               <option value="without-snapshot">Senza snapshot</option>
             </select>
           </label>
+          <label className="text-sm font-medium text-gray-700">
+            Tipologia
+            <select
+              className="form-control mt-1"
+              value={scopeFilter}
+              onChange={(event) => setScopeFilter(event.target.value as GroupScopeFilter)}
+            >
+              <option value="operational">Solo gruppi operativi</option>
+              <option value="all">Tutti i gruppi</option>
+            </select>
+          </label>
         </TableFilters>
       </article>
 
@@ -118,6 +188,15 @@ export default function GroupsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-gray-900">{group.name}</p>
                   <p className="mt-1 text-xs text-gray-400">{group.description ?? "Descrizione non disponibile"}</p>
+                  <div className="mt-2">
+                    <Badge
+                      className={cn(
+                        isSystemGroup(group) ? "bg-gray-100 text-gray-500" : "bg-[#EAF3E8] text-[#1D4E35]",
+                      )}
+                    >
+                      {isSystemGroup(group) ? "Tecnico / sistema" : "Operativo"}
+                    </Badge>
+                  </div>
                 </div>
                 <Badge variant={group.last_seen_snapshot_id != null ? "success" : "warning"}>
                   {group.last_seen_snapshot_id != null ? "Presente" : "Da verificare"}
