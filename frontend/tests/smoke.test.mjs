@@ -82,9 +82,11 @@ test("frontend contains real backend-driven pages", () => {
   assert.match(syncPage, /applyLiveSync/);
   assert.match(syncPage, /auth_mode/);
   assert.match(syncPage, /retry_strategy/);
+  assert.match(syncPage, /retry_jitter_enabled/);
   assert.match(syncPage, /Source/);
   assert.match(syncPage, /Refresh/);
   assert.match(syncPage, /Retry/);
+  assert.match(syncPage, /jitter/);
   assert.match(permissionsPage, /getEffectivePermissions/);
   assert.match(permissionsPage, /calculatePermissionPreview/);
 });

@@ -25,6 +25,8 @@ def test_settings_use_expected_defaults() -> None:
     assert settings.sync_live_backoff_mode == "fixed"
     assert settings.sync_live_backoff_multiplier == 2.0
     assert settings.sync_live_backoff_max_delay_seconds == 30
+    assert settings.sync_live_backoff_jitter_enabled is False
+    assert settings.sync_live_backoff_jitter_ratio == 0.2
     assert settings.sync_schedule_enabled is False
     assert settings.sync_schedule_interval_seconds == 900
     assert settings.sync_schedule_max_cycles == 0
@@ -43,6 +45,8 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     monkeypatch.setenv("SYNC_LIVE_MAX_ATTEMPTS", "5")
     monkeypatch.setenv("SYNC_LIVE_BACKOFF_MODE", "exponential")
     monkeypatch.setenv("SYNC_LIVE_BACKOFF_MULTIPLIER", "3")
+    monkeypatch.setenv("SYNC_LIVE_BACKOFF_JITTER_ENABLED", "true")
+    monkeypatch.setenv("SYNC_LIVE_BACKOFF_JITTER_RATIO", "0.35")
     monkeypatch.setenv("SYNC_SCHEDULE_ENABLED", "true")
     monkeypatch.setenv("SYNC_SCHEDULE_INTERVAL_SECONDS", "60")
     monkeypatch.setenv("BOOTSTRAP_ADMIN_USERNAME", "adminseed")
@@ -58,6 +62,8 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     assert settings.sync_live_max_attempts == 5
     assert settings.sync_live_backoff_mode == "exponential"
     assert settings.sync_live_backoff_multiplier == 3
+    assert settings.sync_live_backoff_jitter_enabled is True
+    assert settings.sync_live_backoff_jitter_ratio == 0.35
     assert settings.sync_schedule_enabled is True
     assert settings.sync_schedule_interval_seconds == 60
     assert settings.bootstrap_admin_username == "adminseed"

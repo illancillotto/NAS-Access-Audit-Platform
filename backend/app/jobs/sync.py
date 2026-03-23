@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import random
 import time
 
 from sqlalchemy.orm import Session
@@ -24,7 +25,14 @@ def compute_retry_delay(attempt: int) -> float:
         delay = base_delay * (settings.sync_live_backoff_multiplier ** max(attempt - 1, 0))
     else:
         delay = base_delay
-    return min(delay, float(settings.sync_live_backoff_max_delay_seconds))
+    capped_delay = min(delay, float(settings.sync_live_backoff_max_delay_seconds))
+    if not settings.sync_live_backoff_jitter_enabled:
+        return capped_delay
+
+    jitter_span = capped_delay * float(settings.sync_live_backoff_jitter_ratio)
+    lower_bound = max(0.0, capped_delay - jitter_span)
+    upper_bound = capped_delay + jitter_span
+    return random.uniform(lower_bound, upper_bound)
 
 
 def run_scheduled_live_sync_cycle(

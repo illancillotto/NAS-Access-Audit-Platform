@@ -178,7 +178,7 @@ Copertura attuale:
 - il progetto espone gia un entrypoint operativo `make live-sync` per esecuzione manuale o schedulata
 - le sync applicate sono ora tracciate in modo persistente con esito e tentativi
 - il progetto espone anche un runner schedulato configurabile per la live sync
-- il retry della live sync non e piu a pausa fissa: supporta backoff configurabile
+- il retry della live sync non e piu a pausa fissa: supporta backoff configurabile e jitter opzionale
 - stack Docker del progetto verificato end-to-end in ambiente locale
 - test iniziali gia utili per evitare regressioni di scaffold
 
@@ -192,7 +192,7 @@ Copertura attuale:
 ## Prossimi Passi Raccomandati
 
 1. verificare la live sync contro un host NAS reale o staging
-2. introdurre persistenza dello scheduler e, se serve, jitter/randomizzazione del backoff
+2. introdurre persistenza dello scheduler
 3. completare il frontend applicativo con UX piu vicina al dominio operativo
 4. ampliare CI con test build/run piu vicini al runtime reale
 5. verificare la live sync contro un NAS reale o staging

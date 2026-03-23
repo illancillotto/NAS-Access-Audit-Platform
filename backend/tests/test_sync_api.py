@@ -90,6 +90,8 @@ def test_sync_capabilities_returns_configured_connector_info() -> None:
     assert response.json()["auth_mode"] == "password"
     assert response.json()["retry_strategy"] == "fixed"
     assert response.json()["retry_max_attempts"] == 3
+    assert response.json()["retry_jitter_enabled"] is False
+    assert response.json()["retry_jitter_ratio"] == 0.2
 
 
 def test_sync_preview_parses_inline_samples() -> None:

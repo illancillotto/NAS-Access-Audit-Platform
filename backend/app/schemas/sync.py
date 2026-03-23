@@ -13,6 +13,8 @@ class SyncCapabilitiesResponse(BaseModel):
     retry_max_attempts: int
     retry_base_delay_seconds: int
     retry_max_delay_seconds: int
+    retry_jitter_enabled: bool
+    retry_jitter_ratio: float
 
 
 class SyncPreviewRequest(BaseModel):

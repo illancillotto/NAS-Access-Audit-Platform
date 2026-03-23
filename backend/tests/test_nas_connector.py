@@ -13,6 +13,8 @@ def test_get_sync_capabilities_reflects_password_auth(monkeypatch) -> None:
     assert capabilities.supports_live_sync is True
     assert capabilities.auth_mode == "password"
     assert capabilities.retry_strategy == "fixed"
+    assert capabilities.retry_jitter_enabled is False
+    assert capabilities.retry_jitter_ratio == 0.2
 
 
 def test_get_sync_capabilities_reflects_private_key_auth(monkeypatch) -> None:

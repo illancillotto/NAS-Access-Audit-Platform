@@ -86,6 +86,8 @@ Le credenziali vanno cambiate tramite variabili ambiente in ambienti non locali.
   - `SYNC_LIVE_BACKOFF_MODE`
   - `SYNC_LIVE_BACKOFF_MULTIPLIER`
   - `SYNC_LIVE_BACKOFF_MAX_DELAY_SECONDS`
+  - `SYNC_LIVE_BACKOFF_JITTER_ENABLED`
+  - `SYNC_LIVE_BACKOFF_JITTER_RATIO`
 - scheduling configurabile:
   - `SYNC_SCHEDULE_ENABLED`
   - `SYNC_SCHEDULE_INTERVAL_SECONDS`

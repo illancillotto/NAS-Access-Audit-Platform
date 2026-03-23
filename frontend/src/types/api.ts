@@ -68,6 +68,8 @@ export type SyncCapabilities = {
   retry_max_attempts: number;
   retry_base_delay_seconds: number;
   retry_max_delay_seconds: number;
+  retry_jitter_enabled: boolean;
+  retry_jitter_ratio: number;
 };
 
 export type SyncPreviewRequest = {

@@ -164,6 +164,9 @@ export default function SyncPage() {
               <p>
                 base {capabilities.retry_base_delay_seconds}s, max {capabilities.retry_max_delay_seconds}s
               </p>
+              <p>
+                jitter {capabilities.retry_jitter_enabled ? "on" : "off"} ({Math.round(capabilities.retry_jitter_ratio * 100)}%)
+              </p>
             </article>
           </div>
         </article>

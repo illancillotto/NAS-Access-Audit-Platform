@@ -34,6 +34,7 @@ def test_compute_retry_delay_supports_fixed_and_exponential_modes(monkeypatch) -
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 2)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_multiplier", 2.0)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 30)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", False)
 
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
     assert compute_retry_delay(1) == 2
@@ -50,16 +51,40 @@ def test_compute_retry_delay_applies_max_cap(monkeypatch) -> None:
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "exponential")
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_multiplier", 3.0)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 20)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", False)
 
     assert compute_retry_delay(1) == 5
     assert compute_retry_delay(2) == 15
     assert compute_retry_delay(3) == 20
 
 
+def test_compute_retry_delay_applies_jitter(monkeypatch) -> None:
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 10)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 30)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", True)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_ratio", 0.2)
+    monkeypatch.setattr("app.jobs.sync.random.uniform", lambda lower, upper: (lower + upper) / 2)
+
+    assert compute_retry_delay(1) == 10
+
+
+def test_compute_retry_delay_jitter_respects_lower_bound(monkeypatch) -> None:
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 1)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 30)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", True)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_ratio", 2.0)
+    monkeypatch.setattr("app.jobs.sync.random.uniform", lambda lower, upper: lower)
+
+    assert compute_retry_delay(1) == 0.0
+
+
 def test_run_live_sync_job_retries_and_then_succeeds(monkeypatch) -> None:
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 3)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 0)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", False)
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
@@ -114,6 +139,7 @@ def test_run_live_sync_job_raises_after_max_attempts(monkeypatch) -> None:
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 2)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 0)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", False)
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
@@ -166,6 +192,7 @@ def test_run_scheduled_live_sync_cycle_sets_scheduler_metadata(monkeypatch) -> N
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_max_attempts", 1)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_retry_delay_seconds", 0)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "fixed")
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", False)
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
@@ -213,6 +240,7 @@ def test_run_live_sync_job_uses_exponential_backoff_between_failures(monkeypatch
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_mode", "exponential")
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_multiplier", 2.0)
     monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_max_delay_seconds", 30)
+    monkeypatch.setattr("app.jobs.sync.settings.sync_live_backoff_jitter_enabled", False)
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")

@@ -40,6 +40,14 @@ class Settings(BaseSettings):
         default=30,
         alias="SYNC_LIVE_BACKOFF_MAX_DELAY_SECONDS",
     )
+    sync_live_backoff_jitter_enabled: bool = Field(
+        default=False,
+        alias="SYNC_LIVE_BACKOFF_JITTER_ENABLED",
+    )
+    sync_live_backoff_jitter_ratio: float = Field(
+        default=0.2,
+        alias="SYNC_LIVE_BACKOFF_JITTER_RATIO",
+    )
     sync_schedule_enabled: bool = Field(default=False, alias="SYNC_SCHEDULE_ENABLED")
     sync_schedule_interval_seconds: int = Field(default=900, alias="SYNC_SCHEDULE_INTERVAL_SECONDS")
     sync_schedule_max_cycles: int = Field(default=0, alias="SYNC_SCHEDULE_MAX_CYCLES")
