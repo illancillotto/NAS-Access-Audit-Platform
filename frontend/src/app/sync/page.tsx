@@ -3,9 +3,27 @@
 import { useEffect, useState } from "react";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
+import { SyncButton } from "@/components/ui/sync-button";
+import { SearchIcon } from "@/components/ui/icons";
 import { applyLiveSync, getSyncCapabilities, getSyncRuns } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { formatDateTime, formatDuration } from "@/lib/presentation";
 import type { SyncApplyResult, SyncCapabilities, SyncRun } from "@/types/api";
+
+function getSyncStatusBadge(status: string) {
+  if (status === "succeeded") {
+    return <Badge variant="success">Completato</Badge>;
+  }
+
+  if (status === "running") {
+    return <Badge className="animate-pulse" variant="info">In corso</Badge>;
+  }
+
+  return <Badge variant="danger">Errore</Badge>;
+}
 
 export default function SyncPage() {
   const [capabilities, setCapabilities] = useState<SyncCapabilities | null>(null);
@@ -46,7 +64,7 @@ export default function SyncPage() {
       const syncRunsResult = await getSyncRuns(token);
       setApplyResult(result);
       setSyncRuns(syncRunsResult);
-      setStatusMessage("Sync completata leggendo dati reali dal NAS.");
+      setStatusMessage("Sincronizzazione completata leggendo dati reali dal NAS.");
       setError(null);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Errore sync NAS");
@@ -58,156 +76,135 @@ export default function SyncPage() {
 
   return (
     <ProtectedPage
-      title="Sync NAS"
-      description="Esegui una sincronizzazione reale dal NAS configurato nel backend e consulta lo storico delle esecuzioni."
+      title="Sincronizzazione"
+      description="Controllo operativo del connector Synology, esecuzione manuale e storico delle run."
+      breadcrumb="Panoramica"
+      topbarActions={<SyncButton loading={isSubmitting} onClick={() => void handleSync()} />}
     >
-      {error ? <p className="status-note error-text">{error}</p> : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       {capabilities ? (
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <h3>Connector NAS</h3>
-              <p className="status-note">
-                Host <span className="mono">{capabilities.host}</span>, autenticazione <span className="mono">{capabilities.auth_mode}</span>, retry <span className="mono">{capabilities.retry_strategy}</span>.
-              </p>
-            </div>
-            <button className="button button-secondary-light" type="button" onClick={() => void loadSyncContext()}>
-              Refresh
-            </button>
-          </div>
-          <div className="panel-grid">
-            <article className="panel">
-              <small>SSH</small>
-              <div className={`status-pill ${capabilities.ssh_configured ? "status-ok" : "status-warn"}`}>
-                {capabilities.ssh_configured ? "Configurato" : "Assente"}
-              </div>
-              <p>{capabilities.username}@{capabilities.host}:{capabilities.port}</p>
-            </article>
-            <article className="panel">
-              <small>Sync Live</small>
-              <div className={`status-pill ${capabilities.supports_live_sync ? "status-ok" : "status-warn"}`}>
-                {capabilities.supports_live_sync ? "Attiva" : "Disabilitata"}
-              </div>
-              <p>Timeout {capabilities.timeout_seconds}s</p>
-            </article>
-            <article className="panel">
-              <small>Retry</small>
-              <div className="metric metric-compact">{capabilities.retry_max_attempts}</div>
-              <p>
-                base {capabilities.retry_base_delay_seconds}s, max {capabilities.retry_max_delay_seconds}s
-              </p>
-              <p>
-                jitter {capabilities.retry_jitter_enabled ? "on" : "off"} ({Math.round(capabilities.retry_jitter_ratio * 100)}%)
-              </p>
-            </article>
-          </div>
-        </article>
-      ) : (
-        <p className="status-note">Nessuna capability disponibile.</p>
-      )}
+        <div className="surface-grid">
+          <MetricCard label="Host NAS" value={capabilities.host} sub={`${capabilities.username}@${capabilities.host}:${capabilities.port}`} />
+          <MetricCard label="Retry" value={capabilities.retry_max_attempts} sub={`${capabilities.retry_strategy} · max ${capabilities.retry_max_delay_seconds}s`} />
+          <MetricCard label="Jitter" value={capabilities.retry_jitter_enabled ? "Attivo" : "Disattivo"} sub={`${Math.round(capabilities.retry_jitter_ratio * 100)}%`} />
+          <MetricCard label="Run registrate" value={syncRuns.length} sub="Storico audit delle sincronizzazioni" />
+        </div>
+      ) : null}
 
-      <article className="panel">
-        <h3>Operazione</h3>
-        <p className="status-note">
-          Questo comando legge utenti, gruppi, share e ACL direttamente dal NAS configurato e aggiorna il dominio audit.
-        </p>
-        <div className="action-row">
-          <button className="button" type="button" onClick={() => void handleSync()} disabled={isSubmitting}>
-            {isSubmitting ? "Sync in corso..." : "Esegui Sync NAS"}
+      <article className="panel-card">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="section-title">Stato connector</p>
+            <p className="section-copy">Configurazione live sync e parametri runtime del backend.</p>
+          </div>
+          <button className="btn-secondary" type="button" onClick={() => void loadSyncContext()}>
+            Aggiorna
           </button>
         </div>
+        {capabilities ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="label-caption">SSH</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">
+                {capabilities.ssh_configured ? "Configurato" : "Non configurato"}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Autenticazione: {capabilities.auth_mode}</p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="label-caption">Live sync</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">
+                {capabilities.supports_live_sync ? "Disponibile" : "Non disponibile"}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Timeout {capabilities.timeout_seconds}s</p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="label-caption">Backoff</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">{capabilities.retry_strategy}</p>
+              <p className="mt-1 text-xs text-gray-400">Base {capabilities.retry_base_delay_seconds}s</p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="label-caption">Jitter</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">
+                {capabilities.retry_jitter_enabled ? "Attivo" : "Disattivo"}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">{Math.round(capabilities.retry_jitter_ratio * 100)}%</p>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            icon={SearchIcon}
+            title="Capabilities non disponibili"
+            description="Impossibile leggere lo stato del connector dal backend."
+          />
+        )}
       </article>
 
-      {statusMessage ? (
-        <article className="panel">
-          <h3>Esito Operazione</h3>
-          <p className="status-note">{statusMessage}</p>
-        </article>
-      ) : null}
-
-      {applyResult ? (
-        <article className="panel">
-          <h3>Risultato Sync</h3>
-          <p className="status-note">
-            Snapshot <span className="mono">#{applyResult.snapshot_id}</span> creato con checksum <span className="mono">{applyResult.snapshot_checksum.slice(0, 12)}</span>.
-          </p>
-          <div className="panel-grid">
-            <article className="panel">
-              <small>Utenti</small>
-              <div className="metric">{applyResult.persisted_users}</div>
-            </article>
-            <article className="panel">
-              <small>Gruppi</small>
-              <div className="metric">{applyResult.persisted_groups}</div>
-            </article>
-            <article className="panel">
-              <small>Share</small>
-              <div className="metric">{applyResult.persisted_shares}</div>
-            </article>
-            <article className="panel">
-              <small>Permission Entries</small>
-              <div className="metric">{applyResult.persisted_permission_entries}</div>
-            </article>
-            <article className="panel">
-              <small>Effective Permissions</small>
-              <div className="metric">{applyResult.persisted_effective_permissions}</div>
-            </article>
-            <article className="panel">
-              <small>Share/ACL Pairs</small>
-              <div className="metric">{applyResult.share_acl_pairs_used}</div>
-            </article>
+      {statusMessage && applyResult ? (
+        <article className="panel-card">
+          <div className="mb-4">
+            <p className="section-title">Ultima sincronizzazione</p>
+            <p className="section-copy">{statusMessage}</p>
+          </div>
+          <div className="surface-grid">
+            <MetricCard label="Snapshot" value={applyResult.snapshot_id} sub={applyResult.snapshot_checksum.slice(0, 12)} />
+            <MetricCard label="Utenti" value={applyResult.persisted_users} sub="Persistiti nella run corrente" />
+            <MetricCard label="Gruppi" value={applyResult.persisted_groups} sub="Persistiti nella run corrente" />
+            <MetricCard label="Share" value={applyResult.persisted_shares} sub="Persistite nella run corrente" />
           </div>
         </article>
       ) : null}
 
-      {syncRuns.length > 0 ? (
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <h3>Storico Sync</h3>
-              <p className="status-note">Ultime esecuzioni ordinate per completamento.</p>
-            </div>
-            <div className="badge">Totale run: {syncRuns.length}</div>
+      <article className="panel-card overflow-hidden p-0">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <p className="section-title">Storico snapshot</p>
+          <p className="section-copy">Esecuzioni in ordine cronologico inverso con stato, durata e snapshot associato.</p>
+        </div>
+        {syncRuns.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={SearchIcon}
+              title="Nessuna sincronizzazione registrata"
+              description="Avvia una sincronizzazione per popolare lo storico delle run."
+            />
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Mode</th>
-                <th>Trigger</th>
-                <th>Source</th>
-                <th>Actor</th>
-                <th>Status</th>
-                <th>Tentativi</th>
-                <th>Durata</th>
-                <th>Snapshot</th>
-                <th>Fine</th>
-              </tr>
-            </thead>
-            <tbody>
-              {syncRuns.map((syncRun) => (
-                <tr key={syncRun.id}>
-                  <td className="mono">{syncRun.id}</td>
-                  <td>{syncRun.mode}</td>
-                  <td>{syncRun.trigger_type}</td>
-                  <td>{syncRun.source_label ?? "-"}</td>
-                  <td>{syncRun.initiated_by ?? "-"}</td>
-                  <td>
-                    <span className={`status-pill ${syncRun.status === "succeeded" ? "status-ok" : "status-warn"}`}>
-                      {syncRun.status}
-                    </span>
-                  </td>
-                  <td>{syncRun.attempts_used}</td>
-                  <td className="mono">{syncRun.duration_ms ?? "-"} ms</td>
-                  <td className="mono">{syncRun.snapshot_id ?? "-"}</td>
-                  <td className="mono">{syncRun.completed_at ?? "-"}</td>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Data avvio</th>
+                  <th>Stato</th>
+                  <th>Durata</th>
+                  <th>Modalità</th>
+                  <th>Trigger</th>
+                  <th>Source</th>
+                  <th>Snapshot</th>
+                  <th>Dettaglio</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
-      ) : null}
+              </thead>
+              <tbody>
+                {syncRuns.map((syncRun) => (
+                  <tr key={syncRun.id}>
+                    <td>{formatDateTime(syncRun.started_at)}</td>
+                    <td>{getSyncStatusBadge(syncRun.status)}</td>
+                    <td>{formatDuration(syncRun.duration_ms)}</td>
+                    <td>{syncRun.mode}</td>
+                    <td>{syncRun.trigger_type}</td>
+                    <td>{syncRun.source_label ?? "—"}</td>
+                    <td>{syncRun.snapshot_id ?? "—"}</td>
+                    <td className="text-xs text-gray-400">
+                      Tentativi {syncRun.attempts_used}
+                      <br />
+                      {syncRun.error_detail ?? "Nessun errore"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
     </ProtectedPage>
   );
 }

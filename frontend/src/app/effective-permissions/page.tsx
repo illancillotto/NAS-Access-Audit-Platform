@@ -1,14 +1,33 @@
 "use client";
 
 import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { DataTable } from "@/components/table/data-table";
+import { TableFilters } from "@/components/table/table-filters";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
+import { PermissionBadge } from "@/components/ui/permission-badge";
+import { SourceTag } from "@/components/ui/source-tag";
+import { SearchIcon } from "@/components/ui/icons";
 import { useDomainData } from "@/hooks/use-domain-data";
 import { calculatePermissionPreview, getEffectivePermissions } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { getPermissionLevel } from "@/lib/presentation";
 import type { EffectivePermission, EffectivePermissionPreview } from "@/types/api";
 
 type AccessFilter = "all" | "read" | "write" | "denied";
+
+type PermissionRow = {
+  id: number;
+  nasUser: string;
+  share: string;
+  canRead: boolean;
+  canWrite: boolean;
+  isDenied: boolean;
+  sourceSummary: string;
+};
 
 export default function EffectivePermissionsPage() {
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
@@ -17,24 +36,16 @@ export default function EffectivePermissionsPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
-  const [username, setUsername] = useState("admin");
-  const [groups, setGroups] = useState("administrators");
-  const [shareName, setShareName] = useState("EmailSaver");
+  const [username, setUsername] = useState("");
+  const [groupsInput, setGroupsInput] = useState("");
+  const [shareName, setShareName] = useState("");
   const [subjectType, setSubjectType] = useState("group");
-  const [subjectName, setSubjectName] = useState("administrators");
+  const [subjectName, setSubjectName] = useState("");
   const [permissionLevel, setPermissionLevel] = useState("write");
   const [isDeny, setIsDeny] = useState(false);
-  const { users, shares, error: domainError } = useDomainData();
+  const { users, groups, shares, error: domainError } = useDomainData();
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
-
-  function getUserLabel(userId: number): string {
-    return users.find((user) => user.id === userId)?.username ?? String(userId);
-  }
-
-  function getShareLabel(shareId: number): string {
-    return shares.find((share) => share.id === shareId)?.name ?? String(shareId);
-  }
 
   useEffect(() => {
     async function loadPermissions() {
@@ -52,6 +63,67 @@ export default function EffectivePermissionsPage() {
     void loadPermissions();
   }, []);
 
+  useEffect(() => {
+    if (!username && users[0]?.username) {
+      setUsername(users[0].username);
+    }
+    if (!shareName && shares[0]?.name) {
+      setShareName(shares[0].name);
+    }
+    if (!groupsInput && groups[0]?.name) {
+      setGroupsInput(groups[0].name);
+    }
+  }, [users, shares, groups, username, shareName, groupsInput]);
+
+  useEffect(() => {
+    const candidates = subjectType === "group" ? groups.map((group) => group.name) : users.map((user) => user.username);
+    if (!subjectName && candidates[0]) {
+      setSubjectName(candidates[0]);
+    } else if (subjectName && !candidates.includes(subjectName) && candidates[0]) {
+      setSubjectName(candidates[0]);
+    }
+  }, [subjectType, users, groups, subjectName]);
+
+  const userLabelMap = useMemo(
+    () => new Map(users.map((user) => [user.id, user.username])),
+    [users],
+  );
+
+  const shareLabelMap = useMemo(
+    () => new Map(shares.map((share) => [share.id, share.name])),
+    [shares],
+  );
+
+  const rows = useMemo<PermissionRow[]>(
+    () =>
+      permissions.map((permission) => ({
+        id: permission.id,
+        nasUser: userLabelMap.get(permission.nas_user_id) ?? String(permission.nas_user_id),
+        share: shareLabelMap.get(permission.share_id) ?? String(permission.share_id),
+        canRead: permission.can_read,
+        canWrite: permission.can_write,
+        isDenied: permission.is_denied,
+        sourceSummary: permission.source_summary,
+      })),
+    [permissions, userLabelMap, shareLabelMap],
+  );
+
+  const filteredRows = useMemo(() => {
+    const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
+
+    return rows.filter((row) => {
+      if (accessFilter === "read" && !row.canRead) return false;
+      if (accessFilter === "write" && !row.canWrite) return false;
+      if (accessFilter === "denied" && !row.isDenied) return false;
+
+      if (!normalizedSearch) return true;
+
+      return [row.nasUser, row.share, row.sourceSummary].some((value) =>
+        value.toLowerCase().includes(normalizedSearch),
+      );
+    });
+  }, [rows, deferredSearchTerm, accessFilter]);
+
   async function handlePreview(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getStoredAccessToken();
@@ -67,7 +139,7 @@ export default function EffectivePermissionsPage() {
         [
           {
             username,
-            groups: groups
+            groups: groupsInput
               .split(",")
               .map((value) => value.trim())
               .filter(Boolean),
@@ -91,249 +163,245 @@ export default function EffectivePermissionsPage() {
     }
   }
 
-  const filteredPermissions = useMemo(() => {
-    const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
-
-    return permissions.filter((permission) => {
-      if (accessFilter === "read" && !permission.can_read) return false;
-      if (accessFilter === "write" && !permission.can_write) return false;
-      if (accessFilter === "denied" && !permission.is_denied) return false;
-
-      if (!normalizedSearch) return true;
-
-      return [
-        getUserLabel(permission.nas_user_id),
-        getShareLabel(permission.share_id),
-        permission.source_summary,
-      ].some((value) => value.toLowerCase().includes(normalizedSearch));
-    });
-  }, [permissions, deferredSearchTerm, accessFilter, users, shares]);
-
-  const readableCount = permissions.filter((permission) => permission.can_read).length;
-  const writableCount = permissions.filter((permission) => permission.can_write).length;
-  const deniedCount = permissions.filter((permission) => permission.is_denied).length;
+  const columns = useMemo<ColumnDef<PermissionRow>[]>(
+    () => [
+      {
+        header: "Utente NAS",
+        accessorKey: "nasUser",
+      },
+      {
+        header: "Cartella",
+        accessorKey: "share",
+      },
+      {
+        header: "Permesso",
+        accessorKey: "sourceSummary",
+        cell: ({ row }) => (
+          <PermissionBadge
+            level={row.original.isDenied ? "deny" : row.original.canWrite ? "rw" : row.original.canRead ? "read" : "none"}
+          />
+        ),
+      },
+      {
+        header: "Read",
+        accessorKey: "canRead",
+        cell: ({ row }) => (
+          <span className={row.original.canRead ? "font-medium text-green-600" : "text-gray-300"}>
+            {row.original.canRead ? "✓" : "—"}
+          </span>
+        ),
+      },
+      {
+        header: "Write",
+        accessorKey: "canWrite",
+        cell: ({ row }) => (
+          <span className={row.original.canWrite ? "font-medium text-green-600" : "text-gray-300"}>
+            {row.original.canWrite ? "✓" : "—"}
+          </span>
+        ),
+      },
+      {
+        header: "Deny",
+        accessorKey: "isDenied",
+        cell: ({ row }) => (
+          <span className={row.original.isDenied ? "font-medium text-red-500" : "text-gray-300"}>
+            {row.original.isDenied ? "✗" : "—"}
+          </span>
+        ),
+      },
+      {
+        header: "Origine",
+        accessorKey: "sourceSummary",
+        cell: ({ row }) => <SourceTag source={row.original.sourceSummary} />,
+      },
+    ],
+    [],
+  );
 
   return (
     <ProtectedPage
-      title="Permessi Effettivi"
-      description="Analisi dei permessi persistiti e preview puntuale del permission engine."
+      title="Permessi effettivi"
+      description="Ultimo snapshot persistito e simulazione guidata del motore di calcolo permessi."
+      breadcrumb="Accessi"
     >
-      <section className="stack">
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <h3>Panoramica</h3>
-              <p className="status-note">Controlla rapidamente accessi in lettura, scrittura e casi negati.</p>
-            </div>
-            <div className="badge">Record: {filteredPermissions.length}/{permissions.length}</div>
-          </div>
-          <div className="panel-grid">
-            <article className="panel">
-              <small>Permessi totali</small>
-              <div className="metric">{permissions.length}</div>
-            </article>
-            <article className="panel">
-              <small>Read</small>
-              <div className="metric">{readableCount}</div>
-            </article>
-            <article className="panel">
-              <small>Write</small>
-              <div className="metric">{writableCount}</div>
-            </article>
-            <article className="panel">
-              <small>Deny</small>
-              <div className="metric">{deniedCount}</div>
-            </article>
-          </div>
-        </article>
+      {error || domainError ? <p className="text-sm text-red-600">{error ?? domainError}</p> : null}
 
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <h3>Filtri</h3>
-              <p className="status-note">Ricerca su utente, share e fonte della regola.</p>
-            </div>
-          </div>
-          <div className="filter-grid filter-grid-compact">
-            <label>
-              Cerca
+      <div className="surface-grid">
+        <MetricCard label="Permessi totali" value={permissions.length} sub="Record persistiti nell’ultimo snapshot" />
+        <MetricCard label="Con lettura" value={permissions.filter((item) => item.can_read).length} sub="Utenti con accesso in lettura" variant="info" />
+        <MetricCard label="Con scrittura" value={permissions.filter((item) => item.can_write).length} sub="Utenti con accesso in scrittura" variant="success" />
+        <MetricCard label="Negati" value={permissions.filter((item) => item.is_denied).length} sub="Record con deny esplicito" variant="danger" />
+      </div>
+
+      <article className="panel-card">
+        <div className="mb-4">
+          <p className="section-title">Filtri</p>
+          <p className="section-copy">Ricerca su utente, cartella e origine con filtro sul tipo di accesso.</p>
+        </div>
+        <TableFilters>
+          <label className="text-sm font-medium text-gray-700">
+            Cerca
+            <input
+              className="form-control mt-1"
+              type="text"
+              placeholder="Es. administrators, EmailSaver, deny"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Accesso
+            <select
+              className="form-control mt-1"
+              value={accessFilter}
+              onChange={(event) => setAccessFilter(event.target.value as AccessFilter)}
+            >
+              <option value="all">Tutti</option>
+              <option value="read">Solo lettura</option>
+              <option value="write">Con scrittura</option>
+              <option value="denied">Solo deny</option>
+            </select>
+          </label>
+        </TableFilters>
+      </article>
+
+      <article className="panel-card">
+        <div className="mb-4">
+          <p className="section-title">Permessi persistiti</p>
+          <p className="section-copy">Tabella filtrabile dei permessi effettivi calcolati e persistiti nel backend.</p>
+        </div>
+        <DataTable
+          data={filteredRows}
+          columns={columns}
+          emptyTitle="Nessun permesso trovato"
+          emptyDescription="Nessun permesso effettivo corrisponde ai filtri selezionati."
+          initialPageSize={12}
+        />
+      </article>
+
+      <article className="panel-card">
+        <div className="mb-4">
+          <p className="section-title">Preview guidata</p>
+          <p className="section-copy">Simula una regola puntuale senza scrivere nulla nel backend.</p>
+        </div>
+        <form className="space-y-4" onSubmit={(event) => void handlePreview(event)}>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <label className="text-sm font-medium text-gray-700">
+              Utente
+              <select className="form-control mt-1" value={username} onChange={(event) => setUsername(event.target.value)}>
+                {users.map((user) => (
+                  <option key={user.id} value={user.username}>
+                    {user.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm font-medium text-gray-700">
+              Gruppi utente
               <input
-                className="text-input"
-                type="text"
-                placeholder="Es. administrators, EmailSaver, deny"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                className="form-control mt-1"
+                list="available-groups"
+                value={groupsInput}
+                onChange={(event) => setGroupsInput(event.target.value)}
               />
             </label>
-            <label>
-              Accesso
-              <select
-                className="select-input"
-                value={accessFilter}
-                onChange={(event) => setAccessFilter(event.target.value as AccessFilter)}
-              >
-                <option value="all">Tutti</option>
-                <option value="read">Con read</option>
-                <option value="write">Con write</option>
-                <option value="denied">Solo deny</option>
+
+            <label className="text-sm font-medium text-gray-700">
+              Cartella
+              <select className="form-control mt-1" value={shareName} onChange={(event) => setShareName(event.target.value)}>
+                {shares.map((share) => (
+                  <option key={share.id} value={share.name}>
+                    {share.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm font-medium text-gray-700">
+              Tipo soggetto
+              <select className="form-control mt-1" value={subjectType} onChange={(event) => setSubjectType(event.target.value)}>
+                <option value="group">Gruppo</option>
+                <option value="user">Utente</option>
+              </select>
+            </label>
+
+            <label className="text-sm font-medium text-gray-700">
+              Soggetto
+              <select className="form-control mt-1" value={subjectName} onChange={(event) => setSubjectName(event.target.value)}>
+                {(subjectType === "group" ? groups.map((group) => group.name) : users.map((user) => user.username)).map(
+                  (value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+
+            <label className="text-sm font-medium text-gray-700">
+              Livello permesso
+              <select className="form-control mt-1" value={permissionLevel} onChange={(event) => setPermissionLevel(event.target.value)}>
+                <option value="read">Lettura</option>
+                <option value="write">Read + Write</option>
               </select>
             </label>
           </div>
-        </article>
 
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <h3>Preview Permission Engine</h3>
-              <p className="status-note">Simula una regola singola contro `POST /permissions/calculate-preview`.</p>
-            </div>
-          </div>
-          <form className="stack" onSubmit={(event) => void handlePreview(event)}>
-            <div className="filter-grid">
-              <label htmlFor="preview-username">
-                Username
-                <input
-                  className="text-input"
-                  id="preview-username"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                />
-              </label>
-              <label htmlFor="preview-groups">
-                Gruppi
-                <input
-                  className="text-input"
-                  id="preview-groups"
-                  value={groups}
-                  onChange={(event) => setGroups(event.target.value)}
-                />
-              </label>
-              <label htmlFor="preview-share">
-                Share
-                <input
-                  className="text-input"
-                  id="preview-share"
-                  value={shareName}
-                  onChange={(event) => setShareName(event.target.value)}
-                />
-              </label>
-              <label htmlFor="preview-subject-type">
-                Subject type
-                <input
-                  className="text-input"
-                  id="preview-subject-type"
-                  value={subjectType}
-                  onChange={(event) => setSubjectType(event.target.value)}
-                />
-              </label>
-              <label htmlFor="preview-subject-name">
-                Subject name
-                <input
-                  className="text-input"
-                  id="preview-subject-name"
-                  value={subjectName}
-                  onChange={(event) => setSubjectName(event.target.value)}
-                />
-              </label>
-              <label htmlFor="preview-level">
-                Permission level
-                <input
-                  className="text-input"
-                  id="preview-level"
-                  value={permissionLevel}
-                  onChange={(event) => setPermissionLevel(event.target.value)}
-                />
-              </label>
-            </div>
-            <label className="checkbox-row" htmlFor="preview-deny">
-              <input
-                id="preview-deny"
-                type="checkbox"
-                checked={isDeny}
-                onChange={(event) => setIsDeny(event.target.checked)}
-              />
-              Regola deny
-            </label>
-            {previewError ? <p className="status-note error-text">{previewError}</p> : null}
-            <div className="action-row">
-              <button className="button" type="submit">
-                Esegui preview
-              </button>
-            </div>
-          </form>
-        </article>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input checked={isDeny} onChange={(event) => setIsDeny(event.target.checked)} type="checkbox" />
+            Applica come deny
+          </label>
 
-        <article className="panel">
-          <h3>Risultato Preview</h3>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Utente</th>
-                <th>Share</th>
-                <th>Read</th>
-                <th>Write</th>
-                <th>Deny</th>
-                <th>Fonte</th>
-              </tr>
-            </thead>
-            <tbody>
-              {previewResults.map((permission) => (
-                <tr key={`${permission.username}-${permission.share_name}`}>
-                  <td>{permission.username}</td>
-                  <td>{permission.share_name}</td>
-                  <td>{permission.can_read ? "Si" : "No"}</td>
-                  <td>{permission.can_write ? "Si" : "No"}</td>
-                  <td>{permission.is_denied ? "Si" : "No"}</td>
-                  <td>{permission.source_summary}</td>
-                </tr>
-              ))}
-              {previewResults.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>Nessuna preview eseguita.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </article>
-      </section>
-
-      {error || domainError ? <p className="status-note error-text">{error ?? domainError}</p> : null}
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Permessi Persistiti</h3>
-            <p className="status-note">Tabella filtrabile dei permessi effettivi calcolati e persistiti nel backend.</p>
-          </div>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Utente NAS</th>
-              <th>Share</th>
-              <th>Read</th>
-              <th>Write</th>
-              <th>Deny</th>
-              <th>Fonte</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPermissions.map((permission) => (
-              <tr key={permission.id}>
-                <td>{getUserLabel(permission.nas_user_id)}</td>
-                <td>{getShareLabel(permission.share_id)}</td>
-                <td>{permission.can_read ? "Si" : "No"}</td>
-                <td>{permission.can_write ? "Si" : "No"}</td>
-                <td>{permission.is_denied ? "Si" : "No"}</td>
-                <td>{permission.source_summary}</td>
-              </tr>
+          <datalist id="available-groups">
+            {groups.map((group) => (
+              <option key={group.id} value={group.name} />
             ))}
-            {filteredPermissions.length === 0 ? (
-              <tr>
-                <td colSpan={6}>Nessun permesso effettivo corrisponde ai filtri attivi.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+          </datalist>
+
+          {previewError ? <p className="text-sm text-red-600">{previewError}</p> : null}
+
+          <button className="btn-primary" type="submit">
+            Calcola preview
+          </button>
+        </form>
+
+        <div className="mt-5">
+          {previewResults.length === 0 ? (
+            <EmptyState
+              icon={SearchIcon}
+              title="Nessuna preview disponibile"
+              description="Compila il form e avvia il calcolo per simulare una regola puntuale."
+            />
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-gray-100">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Utente</th>
+                    <th>Cartella</th>
+                    <th>Permesso</th>
+                    <th>Origine</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewResults.map((result) => (
+                    <tr key={`${result.username}-${result.share_name}-${result.source_summary}`}>
+                      <td>{result.username}</td>
+                      <td>{result.share_name}</td>
+                      <td>
+                        <PermissionBadge level={getPermissionLevel(result)} />
+                      </td>
+                      <td>
+                        <SourceTag source={result.source_summary} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </article>
     </ProtectedPage>
   );

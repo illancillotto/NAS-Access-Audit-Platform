@@ -2,21 +2,40 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PropsWithChildren, useEffect, useState } from "react";
+import { PropsWithChildren, type ReactNode, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { getCurrentUser } from "@/lib/api";
+import { Topbar } from "@/components/layout/topbar";
+import { getCurrentUser, getDashboardSummary } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
-import type { CurrentUser } from "@/types/api";
+import type { CurrentUser, DashboardSummary } from "@/types/api";
 
 type ProtectedPageProps = PropsWithChildren<{
   title: string;
   description: string;
+  breadcrumb?: string;
+  topbarActions?: ReactNode;
 }>;
 
-export function ProtectedPage({ title, description, children }: ProtectedPageProps) {
+const emptySummary: DashboardSummary = {
+  nas_users: 0,
+  nas_groups: 0,
+  shares: 0,
+  reviews: 0,
+  snapshots: 0,
+  sync_runs: 0,
+};
+
+export function ProtectedPage({
+  title,
+  description,
+  breadcrumb,
+  topbarActions,
+  children,
+}: ProtectedPageProps) {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary>(emptySummary);
   const [statusMessage, setStatusMessage] = useState("Accedi per caricare dati dal backend.");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -31,13 +50,19 @@ export function ProtectedPage({ title, description, children }: ProtectedPagePro
       }
 
       try {
-        const user = await getCurrentUser(token);
+        const [user, dashboardSummary] = await Promise.all([
+          getCurrentUser(token),
+          getDashboardSummary(token),
+        ]);
+
         setCurrentUser(user);
+        setSummary(dashboardSummary);
         setLoadError(null);
         setStatusMessage("Sessione backend attiva.");
       } catch (error) {
         clearStoredAccessToken();
         setCurrentUser(null);
+        setSummary(emptySummary);
         setLoadError(error instanceof Error ? error.message : "Errore imprevisto");
         setStatusMessage("Sessione non valida o backend non raggiungibile.");
         router.replace("/login");
@@ -52,19 +77,24 @@ export function ProtectedPage({ title, description, children }: ProtectedPagePro
   function handleLogout(): void {
     setCurrentUser(null);
     setLoadError(null);
+    setSummary(emptySummary);
     setStatusMessage("Sessione chiusa. Effettua di nuovo il login.");
     router.replace("/login");
   }
 
   if (isCheckingSession || !currentUser) {
     return (
-      <main className="login-wrap">
-        <section className="login-card">
-          <p className="badge">Accesso richiesto</p>
-          <h1>{title}</h1>
-          <p>{description}</p>
-          <p className={`status-note${loadError ? " error-text" : ""}`}>{loadError ?? statusMessage}</p>
-          <Link className="button" href="/login">
+      <main className="auth-shell">
+        <section className="auth-card">
+          <p className="mb-2 inline-flex rounded-full bg-[#EAF3E8] px-3 py-1 text-xs font-medium text-[#1D4E35]">
+            Accesso richiesto
+          </p>
+          <h1 className="page-heading">{title}</h1>
+          <p className="mt-2 text-sm text-gray-500">{description}</p>
+          <p className={`mt-4 text-sm ${loadError ? "text-red-600" : "text-gray-500"}`}>
+            {loadError ?? statusMessage}
+          </p>
+          <Link className="btn-primary mt-6" href="/login">
             Vai al login
           </Link>
         </section>
@@ -73,27 +103,19 @@ export function ProtectedPage({ title, description, children }: ProtectedPagePro
   }
 
   return (
-    <AppShell currentUser={currentUser} onLogout={handleLogout}>
-      <div className="topbar">
-        <div className="badge">{currentUser ? "Backend collegato" : "Sessione richiesta"}</div>
-        <div className="badge">API target: /api</div>
-      </div>
-
-      <section className="hero">
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </section>
-
-      <section className="stack">
-        <article className="panel">
-          <h3>Stato accesso</h3>
-          <p className={`status-note${loadError ? " error-text" : ""}`}>{loadError ?? statusMessage}</p>
-          {!currentUser ? (
-            <p className="status-note">
-              Vai alla <Link href="/login">pagina di login</Link> per usare il backend reale.
-            </p>
-          ) : children}
-        </article>
+    <AppShell
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      reviewBadge={summary.reviews}
+      userBadge={summary.nas_users}
+    >
+      <Topbar pageTitle={title} breadcrumb={breadcrumb} actions={topbarActions} />
+      <section className="page-body">
+        <div className="mb-6">
+          <h2 className="page-heading">{title}</h2>
+          <p className="mt-1 text-sm text-gray-500">{description}</p>
+        </div>
+        <div className="page-stack">{children}</div>
       </section>
     </AppShell>
   );

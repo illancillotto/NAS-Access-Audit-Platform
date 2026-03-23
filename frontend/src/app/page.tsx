@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { getCurrentUser, getDashboardSummary } from "@/lib/api";
+import { Topbar } from "@/components/layout/topbar";
+import { AlertBanner } from "@/components/ui/alert-banner";
+import { MetricCard } from "@/components/ui/metric-card";
+import { PermissionBadge } from "@/components/ui/permission-badge";
+import { SourceTag } from "@/components/ui/source-tag";
+import { SyncButton } from "@/components/ui/sync-button";
+import { AlertTriangleIcon, ChevronRightIcon, FolderIcon, SearchIcon, UserIcon } from "@/components/ui/icons";
+import {
+  getCurrentUser,
+  getDashboardSummary,
+  getEffectivePermissions,
+  getNasUsers,
+  getShares,
+} from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
-import type { CurrentUser, DashboardSummary } from "@/types/api";
+import { getPermissionLevel } from "@/lib/presentation";
+import type { CurrentUser, DashboardSummary, EffectivePermission, NasUser, Share } from "@/types/api";
 
 const emptySummary: DashboardSummary = {
   nas_users: 0,
@@ -22,7 +36,9 @@ export default function HomePage() {
   const router = useRouter();
   const [summary, setSummary] = useState<DashboardSummary>(emptySummary);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Accedi per caricare i dati reali dal backend.");
+  const [users, setUsers] = useState<NasUser[]>([]);
+  const [shares, setShares] = useState<Share[]>([]);
+  const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
@@ -36,21 +52,31 @@ export default function HomePage() {
       }
 
       try {
-        const [user, dashboardSummary] = await Promise.all([
+        const [
+          user,
+          dashboardSummary,
+          nasUsers,
+          shareItems,
+          permissionItems,
+        ] = await Promise.all([
           getCurrentUser(token),
           getDashboardSummary(token),
+          getNasUsers(token),
+          getShares(token),
+          getEffectivePermissions(token),
         ]);
 
         setCurrentUser(user);
         setSummary(dashboardSummary);
+        setUsers(nasUsers);
+        setShares(shareItems);
+        setPermissions(permissionItems);
         setLoadError(null);
-        setStatusMessage("Dashboard collegata al backend FastAPI.");
       } catch (error) {
         clearStoredAccessToken();
         setCurrentUser(null);
         setSummary(emptySummary);
         setLoadError(error instanceof Error ? error.message : "Errore imprevisto");
-        setStatusMessage("Sessione non valida o backend non raggiungibile.");
         router.replace("/login");
       } finally {
         setIsCheckingSession(false);
@@ -60,32 +86,54 @@ export default function HomePage() {
     void loadDashboard();
   }, [router]);
 
-  const dashboardCards = [
-    { title: "Utenti NAS", value: String(summary.nas_users), note: "Utenti sincronizzati o seedati nel backend" },
-    { title: "Gruppi", value: String(summary.nas_groups), note: "Gruppi NAS attualmente persistiti" },
-    { title: "Share", value: String(summary.shares), note: "Cartelle condivise presenti nel dominio audit" },
-    { title: "Review", value: String(summary.reviews), note: "Review registrate nella piattaforma" },
-    { title: "Snapshot", value: String(summary.snapshots), note: "Fotografie disponibili per audit e sync" },
-    { title: "Sync Run", value: String(summary.sync_runs), note: "Esecuzioni sync registrate con audit trail" },
-  ];
-
   function handleLogout(): void {
     setCurrentUser(null);
     setSummary(emptySummary);
-    setLoadError(null);
-    setStatusMessage("Sessione chiusa. Accedi di nuovo per ricaricare i dati.");
     router.replace("/login");
+  }
+
+  const recentUsers = useMemo(
+    () =>
+      [...users]
+        .sort((left, right) => right.id - left.id)
+        .slice(0, 5),
+    [users],
+  );
+
+  const recentShares = useMemo(
+    () =>
+      [...shares]
+        .sort((left, right) => left.name.localeCompare(right.name, "it"))
+        .slice(0, 5),
+    [shares],
+  );
+
+  const latestPermissions = useMemo(() => permissions.slice(0, 8), [permissions]);
+  const deniedCount = permissions.filter((item) => item.is_denied).length;
+
+  function getUserLabel(userId: number): string {
+    return users.find((user) => user.id === userId)?.username ?? String(userId);
+  }
+
+  function getShareLabel(shareId: number): string {
+    return shares.find((share) => share.id === shareId)?.name ?? String(shareId);
   }
 
   if (isCheckingSession || !currentUser) {
     return (
-      <main className="login-wrap">
-        <section className="login-card">
-          <p className="badge">Reindirizzamento</p>
-          <h1>Verifica sessione</h1>
-          <p>Controllo credenziali locali e accesso alla piattaforma.</p>
-          <p className={`status-note${loadError ? " error-text" : ""}`}>{loadError ?? statusMessage}</p>
-          <Link className="button" href="/login">
+      <main className="auth-shell">
+        <section className="auth-card">
+          <p className="mb-2 inline-flex rounded-full bg-[#EAF3E8] px-3 py-1 text-xs font-medium text-[#1D4E35]">
+            Reindirizzamento
+          </p>
+          <h1 className="page-heading">Verifica sessione</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Controllo credenziali locali e connessione al backend.
+          </p>
+          <p className={`mt-4 text-sm ${loadError ? "text-red-600" : "text-gray-500"}`}>
+            {loadError ?? "Accedi per caricare i dati reali dal backend."}
+          </p>
+          <Link className="btn-primary mt-6" href="/login">
             Vai al login
           </Link>
         </section>
@@ -94,49 +142,159 @@ export default function HomePage() {
   }
 
   return (
-    <AppShell currentUser={currentUser} onLogout={handleLogout}>
-      <div className="topbar">
-        <div>
-          <p className="badge">{currentUser ? "Backend collegato" : "Ambiente bootstrap"}</p>
-        </div>
-        <div className="badge">API target: /api</div>
-      </div>
+    <AppShell
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      reviewBadge={summary.reviews}
+      userBadge={summary.nas_users}
+    >
+      <Topbar
+        pageTitle="Dashboard"
+        actions={<SyncButton label="Apri Sync" onClick={() => router.push("/sync")} />}
+      />
 
-      <section className="hero">
-        <h2>Controllo centralizzato degli accessi NAS</h2>
-        <p>
-          La dashboard ora e predisposta per mostrare dati reali del backend. Il
-          primo step operativo e il login applicativo, che carica utente corrente
-          e riepilogo audit.
-        </p>
-      </section>
+      <section className="page-body">
+        <div className="page-stack">
+          {summary.reviews > 0 ? (
+            <AlertBanner
+              icon={<AlertTriangleIcon className="h-4 w-4" />}
+              title={`${summary.reviews} review in attesa`}
+              action={
+                <Link
+                  href="/reviews"
+                  className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-200"
+                >
+                  Vai alle review
+                </Link>
+              }
+            >
+              Permessi da validare dai responsabili di settore. Lo stato corrente e pronto per il triage operativo.
+            </AlertBanner>
+          ) : null}
 
-      <section className="stack">
-        <article className="panel">
-          <h3>Stato sessione</h3>
-          <p className={`status-note${loadError ? " error-text" : ""}`}>{loadError ?? statusMessage}</p>
-          {!currentUser ? (
-            <p className="status-note">
-              Vai alla <Link href="/login">pagina di login</Link> per usare il backend reale.
+          <div>
+            <h2 className="page-heading">Controllo centralizzato degli accessi NAS</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Vista sintetica di utenti, cartelle condivise, permessi effettivi e review aperte.
             </p>
-          ) : (
-            <div className="action-row">
-              <Link className="button" href="/sync">Apri Sync</Link>
-              <Link className="button button-secondary-light" href="/effective-permissions">Apri Permessi</Link>
-              <Link className="button button-secondary-light" href="/users">Apri Utenti</Link>
-            </div>
-          )}
-        </article>
+          </div>
 
-        <section className="panel-grid">
-          {dashboardCards.map((card) => (
-            <article className="panel" key={card.title}>
-              <small>{card.title}</small>
-              <div className="metric">{card.value}</div>
-              <p>{card.note}</p>
+          <div className="surface-grid">
+            <MetricCard label="Utenti NAS" value={summary.nas_users} sub="Utenti sincronizzati dal dominio audit" />
+            <MetricCard label="Cartelle" value={summary.shares} sub="Share presenti nell’ultimo snapshot" />
+            <MetricCard label="Permessi calcolati" value={permissions.length} sub="Permessi effettivi persistiti" variant="success" />
+            <MetricCard label="Accessi negati" value={deniedCount} sub="Regole con deny attivo" variant={deniedCount > 0 ? "danger" : "default"} />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <article className="panel-card">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="section-title">Utenti recenti con accesso</p>
+                  <p className="section-copy">Ultimi utenti presenti nel dominio sincronizzato.</p>
+                </div>
+                <Link href="/users" className="text-sm font-medium text-[#1D4E35]">
+                  Tutti gli utenti
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {recentUsers.map((user) => (
+                  <Link
+                    key={user.id}
+                    href={`/users/${user.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-3 transition hover:border-gray-200 hover:bg-gray-50"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#D3EAD4] text-[#1D4E35]">
+                      <UserIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">{user.username}</p>
+                      <p className="truncate text-xs text-gray-400">{user.full_name ?? "Nome non disponibile"}</p>
+                    </div>
+                    <ChevronRightIcon className="h-4 w-4 text-gray-300" />
+                  </Link>
+                ))}
+              </div>
             </article>
-          ))}
-        </section>
+
+            <article className="panel-card">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="section-title">Cartelle condivise</p>
+                  <p className="section-copy">Share pronte per verifica permessi e review.</p>
+                </div>
+                <Link href="/shares" className="text-sm font-medium text-[#1D4E35]">
+                  Tutte le cartelle
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {recentShares.map((share) => (
+                  <Link
+                    key={share.id}
+                    href={`/shares/${share.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-3 transition hover:border-gray-200 hover:bg-gray-50"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#D3EAD4] text-[#1D4E35]">
+                      <FolderIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">{share.name}</p>
+                      <p className="truncate text-xs text-gray-400">{share.path}</p>
+                    </div>
+                    <ChevronRightIcon className="h-4 w-4 text-gray-300" />
+                  </Link>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <article className="panel-card">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="section-title">Permessi effettivi recenti</p>
+                <p className="section-copy">Estratto dell’ultimo snapshot persistito.</p>
+              </div>
+              <Link href="/effective-permissions" className="text-sm font-medium text-[#1D4E35]">
+                Apri vista completa
+              </Link>
+            </div>
+
+            {latestPermissions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                <SearchIcon className="mx-auto h-5 w-5 text-gray-300" />
+                <p className="mt-3 text-sm font-medium text-gray-900">Nessun permesso disponibile</p>
+                <p className="mt-1 text-sm text-gray-500">Esegui una sincronizzazione per popolare l’ultimo snapshot.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-gray-100">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Utente</th>
+                      <th>Cartella</th>
+                      <th>Permesso</th>
+                      <th>Origine</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestPermissions.map((permission) => (
+                      <tr key={permission.id}>
+                        <td>{getUserLabel(permission.nas_user_id)}</td>
+                        <td>{getShareLabel(permission.share_id)}</td>
+                        <td>
+                          <PermissionBadge level={getPermissionLevel(permission)} />
+                        </td>
+                        <td>
+                          <SourceTag source={permission.source_summary} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+        </div>
       </section>
     </AppShell>
   );

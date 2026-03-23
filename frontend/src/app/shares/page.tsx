@@ -1,16 +1,28 @@
 "use client";
 
+import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { ProtectedPage } from "@/components/app/protected-page";
-import { getShares } from "@/lib/api";
+import { TableFilters } from "@/components/table/table-filters";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
+import { FolderIcon, SearchIcon } from "@/components/ui/icons";
+import { Badge } from "@/components/ui/badge";
+import { getEffectivePermissions, getShares } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
-import type { Share } from "@/types/api";
+import type { EffectivePermission, Share } from "@/types/api";
 
 type SectorFilter = "all" | "with-sector" | "without-sector";
 
+type ShareRow = Share & {
+  userCount: number;
+  denyCount: number;
+};
+
 export default function SharesPage() {
   const [shares, setShares] = useState<Share[]>([]);
+  const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sectorFilter, setSectorFilter] = useState<SectorFilter>("all");
@@ -23,7 +35,9 @@ export default function SharesPage() {
       if (!token) return;
 
       try {
-        setShares(await getShares(token));
+        const [shareItems, permissionItems] = await Promise.all([getShares(token), getEffectivePermissions(token)]);
+        setShares(shareItems);
+        setPermissions(permissionItems);
         setError(null);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Errore caricamento share");
@@ -33,10 +47,21 @@ export default function SharesPage() {
     void loadShares();
   }, []);
 
+  const shareRows = useMemo<ShareRow[]>(() => {
+    return shares.map((share) => {
+      const related = permissions.filter((permission) => permission.share_id === share.id);
+      return {
+        ...share,
+        userCount: new Set(related.filter((item) => item.can_read || item.can_write).map((item) => item.nas_user_id)).size,
+        denyCount: related.filter((item) => item.is_denied).length,
+      };
+    });
+  }, [shares, permissions]);
+
   const filteredShares = useMemo(() => {
     const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
 
-    return shares
+    return shareRows
       .filter((share) => {
         if (sectorFilter === "with-sector" && !share.sector) return false;
         if (sectorFilter === "without-sector" && share.sector) return false;
@@ -48,68 +73,43 @@ export default function SharesPage() {
         );
       })
       .sort((left, right) => left.name.localeCompare(right.name, "it"));
-  }, [shares, deferredSearchTerm, sectorFilter]);
-
-  const sharesWithSector = shares.filter((share) => Boolean(share.sector)).length;
-  const sharesWithDescription = shares.filter((share) => Boolean(share.description)).length;
+  }, [shareRows, deferredSearchTerm, sectorFilter]);
 
   return (
     <ProtectedPage
-      title="Share NAS"
-      description="Vista operativa delle cartelle condivise con filtri su settore, path e descrizione."
+      title="Cartelle condivise"
+      description="Catalogo delle share del NAS con indicatori di accesso, deny e classificazione settoriale."
+      breadcrumb="Accessi"
     >
-      {error ? <p className="status-note error-text">{error}</p> : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Panoramica</h3>
-            <p className="status-note">Individua rapidamente share senza classificazione o con naming da verificare.</p>
-          </div>
-          <div className="badge">Record: {filteredShares.length}/{shares.length}</div>
-        </div>
-        <div className="panel-grid">
-          <article className="panel">
-            <small>Share totali</small>
-            <div className="metric">{shares.length}</div>
-          </article>
-          <article className="panel">
-            <small>Con settore</small>
-            <div className="metric">{sharesWithSector}</div>
-          </article>
-          <article className="panel">
-            <small>Con descrizione</small>
-            <div className="metric">{sharesWithDescription}</div>
-          </article>
-          <article className="panel">
-            <small>Filtrate</small>
-            <div className="metric">{shares.length - filteredShares.length}</div>
-          </article>
-        </div>
-      </article>
+      <div className="surface-grid">
+        <MetricCard label="Share NAS" value={shares.length} sub="Cartelle condivise sincronizzate" />
+        <MetricCard label="Con settore" value={shares.filter((share) => Boolean(share.sector)).length} sub="Share con classificazione funzionale" />
+        <MetricCard label="Con deny" value={shareRows.filter((share) => share.denyCount > 0).length} sub="Share con almeno un deny attivo" variant="danger" />
+        <MetricCard label="Con utenti" value={shareRows.filter((share) => share.userCount > 0).length} sub="Share con accessi calcolati" />
+      </div>
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Filtri</h3>
-            <p className="status-note">Ricerca su nome, path, settore e descrizione.</p>
-          </div>
+      <article className="panel-card">
+        <div className="mb-4">
+          <p className="section-title">Filtri</p>
+          <p className="section-copy">Ricerca su nome, path, settore e descrizione.</p>
         </div>
-        <div className="filter-grid filter-grid-compact">
-          <label>
+        <TableFilters>
+          <label className="text-sm font-medium text-gray-700">
             Cerca
             <input
-              className="text-input"
+              className="form-control mt-1"
               type="text"
               placeholder="Es. EmailSaver, /volume1, legali"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </label>
-          <label>
+          <label className="text-sm font-medium text-gray-700">
             Settore
             <select
-              className="select-input"
+              className="form-control mt-1"
               value={sectorFilter}
               onChange={(event) => setSectorFilter(event.target.value as SectorFilter)}
             >
@@ -118,49 +118,45 @@ export default function SharesPage() {
               <option value="without-sector">Senza settore</option>
             </select>
           </label>
-        </div>
+        </TableFilters>
       </article>
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Elenco Share</h3>
-            <p className="status-note">Layout pensato per verifiche rapide su naming, destinazione e classificazione funzionale.</p>
-          </div>
+      {filteredShares.length === 0 ? (
+        <EmptyState
+          icon={SearchIcon}
+          title="Nessuna cartella trovata"
+          description="Nessuna share corrisponde ai filtri selezionati."
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredShares.map((share) => (
+            <Link
+              key={share.id}
+              href={`/shares/${share.id}`}
+              className="block rounded-xl border border-gray-100 bg-white p-4 shadow-panel transition hover:border-gray-200 hover:shadow-sm"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#D3EAD4]">
+                  <FolderIcon className="h-5 w-5 text-[#1D4E35]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{share.name}</p>
+                  <p className="truncate text-xs text-gray-400">{share.path}</p>
+                </div>
+                {share.denyCount > 0 ? <Badge variant="danger">{share.denyCount} deny</Badge> : null}
+              </div>
+              <div className="mt-3 border-t border-gray-50 pt-3 text-xs text-gray-400">
+                <div className="flex items-center gap-2">
+                  <span>{share.userCount} utenti</span>
+                  <span>·</span>
+                  <span>{share.last_seen_snapshot_id ?? "—"} snapshot</span>
+                </div>
+                {share.sector ? <p className="mt-2 text-right">{share.sector}</p> : null}
+              </div>
+            </Link>
+          ))}
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Share</th>
-              <th>Path</th>
-              <th>Settore</th>
-              <th>Descrizione</th>
-              <th>Snapshot</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredShares.map((share) => (
-              <tr key={share.id}>
-                <td>
-                  <div className="entity-cell">
-                    <strong>{share.name}</strong>
-                    <span>ID #{share.id}</span>
-                  </div>
-                </td>
-                <td className="mono">{share.path}</td>
-                <td>{share.sector ?? "-"}</td>
-                <td>{share.description ?? "-"}</td>
-                <td className="mono">{share.last_seen_snapshot_id ?? "-"}</td>
-              </tr>
-            ))}
-            {filteredShares.length === 0 ? (
-              <tr>
-                <td colSpan={5}>Nessuna share corrisponde ai filtri attivi.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </article>
+      )}
     </ProtectedPage>
   );
 }

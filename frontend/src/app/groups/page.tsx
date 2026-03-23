@@ -3,6 +3,11 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { TableFilters } from "@/components/table/table-filters";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
+import { SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { getNasGroups } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import type { NasGroup } from "@/types/api";
@@ -50,66 +55,41 @@ export default function GroupsPage() {
       .sort((left, right) => left.name.localeCompare(right.name, "it"));
   }, [groups, deferredSearchTerm, snapshotFilter]);
 
-  const groupsWithDescription = groups.filter((group) => Boolean(group.description)).length;
-  const groupsWithSnapshot = groups.filter((group) => group.last_seen_snapshot_id != null).length;
-
   return (
     <ProtectedPage
       title="Gruppi NAS"
-      description="Elenco gruppi sincronizzati dal NAS con filtri rapidi per descrizione e ultimo snapshot."
+      description="Vista dei gruppi presenti nel dominio sincronizzato con focus su presenza nel ciclo di snapshot."
+      breadcrumb="Accessi"
     >
-      {error ? <p className="status-note error-text">{error}</p> : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Panoramica</h3>
-            <p className="status-note">Controlla rapidamente consistenza descrittiva e presenza nei cicli di sync.</p>
-          </div>
-          <div className="badge">Record: {filteredGroups.length}/{groups.length}</div>
-        </div>
-        <div className="panel-grid">
-          <article className="panel">
-            <small>Gruppi totali</small>
-            <div className="metric">{groups.length}</div>
-          </article>
-          <article className="panel">
-            <small>Con descrizione</small>
-            <div className="metric">{groupsWithDescription}</div>
-          </article>
-          <article className="panel">
-            <small>Con snapshot</small>
-            <div className="metric">{groupsWithSnapshot}</div>
-          </article>
-          <article className="panel">
-            <small>Filtrati</small>
-            <div className="metric">{groups.length - filteredGroups.length}</div>
-          </article>
-        </div>
-      </article>
+      <div className="surface-grid">
+        <MetricCard label="Gruppi NAS" value={groups.length} sub="Gruppi sincronizzati dal NAS" />
+        <MetricCard label="Con snapshot" value={groups.filter((item) => item.last_seen_snapshot_id != null).length} sub="Visti almeno una volta" />
+        <MetricCard label="Con descrizione" value={groups.filter((item) => Boolean(item.description)).length} sub="Gruppi con metadata descrittivi" />
+        <MetricCard label="Senza snapshot" value={groups.filter((item) => item.last_seen_snapshot_id == null).length} sub="Da verificare nei cicli sync" variant="warning" />
+      </div>
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Filtri</h3>
-            <p className="status-note">Ricerca su nome e descrizione del gruppo.</p>
-          </div>
+      <article className="panel-card">
+        <div className="mb-4">
+          <p className="section-title">Filtri</p>
+          <p className="section-copy">Ricerca su nome e descrizione del gruppo con filtro snapshot.</p>
         </div>
-        <div className="filter-grid filter-grid-compact">
-          <label>
+        <TableFilters>
+          <label className="text-sm font-medium text-gray-700">
             Cerca
             <input
-              className="text-input"
+              className="form-control mt-1"
               type="text"
               placeholder="Es. administrators, protocollo"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </label>
-          <label>
+          <label className="text-sm font-medium text-gray-700">
             Snapshot
             <select
-              className="select-input"
+              className="form-control mt-1"
               value={snapshotFilter}
               onChange={(event) => setSnapshotFilter(event.target.value as SnapshotFilter)}
             >
@@ -118,45 +98,38 @@ export default function GroupsPage() {
               <option value="without-snapshot">Senza snapshot</option>
             </select>
           </label>
-        </div>
+        </TableFilters>
       </article>
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Elenco Gruppi</h3>
-            <p className="status-note">Vista ordinata alfabeticamente con focus operativo su descrizione e presenza nel dominio corrente.</p>
-          </div>
+      {filteredGroups.length === 0 ? (
+        <EmptyState
+          icon={SearchIcon}
+          title="Nessun gruppo trovato"
+          description="Nessun gruppo corrisponde ai filtri selezionati."
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredGroups.map((group) => (
+            <article key={group.id} className="panel-card">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#D3EAD4] text-[#1D4E35]">
+                  <UsersIcon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{group.name}</p>
+                  <p className="mt-1 text-xs text-gray-400">{group.description ?? "Descrizione non disponibile"}</p>
+                </div>
+                <Badge variant={group.last_seen_snapshot_id != null ? "success" : "warning"}>
+                  {group.last_seen_snapshot_id != null ? "Presente" : "Da verificare"}
+                </Badge>
+              </div>
+              <div className="mt-4 border-t border-gray-50 pt-3 text-xs text-gray-400">
+                Ultimo snapshot: {group.last_seen_snapshot_id ?? "—"}
+              </div>
+            </article>
+          ))}
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Gruppo</th>
-              <th>Descrizione</th>
-              <th>Ultimo snapshot</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredGroups.map((group) => (
-              <tr key={group.id}>
-                <td>
-                  <div className="entity-cell">
-                    <strong>{group.name}</strong>
-                    <span>ID #{group.id}</span>
-                  </div>
-                </td>
-                <td>{group.description ?? "-"}</td>
-                <td className="mono">{group.last_seen_snapshot_id ?? "-"}</td>
-              </tr>
-            ))}
-            {filteredGroups.length === 0 ? (
-              <tr>
-                <td colSpan={3}>Nessun gruppo NAS corrisponde ai filtri attivi.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </article>
+      )}
     </ProtectedPage>
   );
 }

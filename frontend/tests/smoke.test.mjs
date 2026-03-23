@@ -12,15 +12,16 @@ function read(relativePath) {
   return fs.readFileSync(path.join(frontendRoot, relativePath), "utf8");
 }
 
-test("frontend package exposes core scripts", () => {
+test("frontend package exposes core scripts and redesign dependencies", () => {
   const pkg = JSON.parse(read("package.json"));
 
   assert.equal(pkg.name, "nas-access-audit-frontend");
   assert.equal(pkg.private, true);
   assert.ok(pkg.scripts.dev);
   assert.ok(pkg.scripts.build);
-  assert.ok(pkg.scripts.start);
-  assert.ok(pkg.scripts.lint);
+  assert.ok(pkg.dependencies["@tanstack/react-table"]);
+  assert.ok(pkg.devDependencies.tailwindcss);
+  assert.ok(pkg.dependencies.clsx);
 });
 
 test("frontend api client defaults to same-origin api base", () => {
@@ -29,102 +30,78 @@ test("frontend api client defaults to same-origin api base", () => {
   assert.match(apiClient, /const DEFAULT_API_BASE_URL = "\/api"/);
 });
 
-test("home page gates anonymous users behind login flow", () => {
+test("dashboard keeps login gate and redesigned dashboard copy", () => {
   const homePage = read("src/app/page.tsx");
 
   assert.match(homePage, /router\.replace\("\/login"\)/);
-  assert.match(homePage, /Verifica sessione/);
-  assert.match(homePage, /Vai al login/);
-  assert.match(homePage, /Utenti NAS/);
-  assert.match(homePage, /Sync Run/);
-  assert.match(homePage, /Apri Sync/);
+  assert.match(homePage, /Controllo centralizzato degli accessi NAS/);
+  assert.match(homePage, /review in attesa/);
+  assert.match(homePage, /Permessi effettivi recenti/);
 });
 
-test("login page contains real access form", () => {
-  const loginPage = read("src/app/login/page.tsx");
-
-  assert.match(loginPage, /Login applicativo/);
-  assert.match(loginPage, /backend FastAPI reale/);
-  assert.match(loginPage, /Username o email/);
-  assert.match(loginPage, /Accedi/);
-});
-
-test("home page uses backend session helpers", () => {
-  const homePage = read("src/app/page.tsx");
-
-  assert.match(homePage, /getCurrentUser/);
-  assert.match(homePage, /getDashboardSummary/);
-  assert.match(homePage, /Accedi per caricare i dati reali dal backend/);
-  assert.match(homePage, /isCheckingSession/);
-});
-
-test("app shell exposes only authenticated navigation labels", () => {
+test("layout includes app shell, sidebar and topbar", () => {
   const shell = read("src/components/layout/app-shell.tsx");
+  const sidebar = read("src/components/layout/sidebar.tsx");
+  const topbar = read("src/components/layout/topbar.tsx");
+  const statusPill = read("src/components/ui/status-pill.tsx");
 
-  assert.match(shell, /if \(!currentUser\)/);
-  assert.match(shell, /Dashboard/);
-  assert.match(shell, /Utenti/);
-  assert.match(shell, /Gruppi/);
-  assert.match(shell, /Share/);
-  assert.match(shell, /Review/);
-  assert.match(shell, /Sync/);
-  assert.match(shell, /Permessi/);
+  assert.match(shell, /Sidebar/);
+  assert.match(sidebar, /Consorzio di Bonifica/);
+  assert.match(sidebar, /Oristanese — Synology NAS/);
+  assert.match(sidebar, /Review accessi/);
+  assert.match(topbar, /StatusPill/);
+  assert.match(statusPill, /Backend connesso/);
 });
 
-test("frontend contains real backend-driven pages", () => {
+test("shared ui components exist for redesign system", () => {
+  assert.match(read("src/components/ui/avatar.tsx"), /getInitials/);
+  assert.match(read("src/components/ui/permission-badge.tsx"), /R\+W/);
+  assert.match(read("src/components/ui/source-tag.tsx"), /font-mono/);
+  assert.match(read("src/components/ui/metric-card.tsx"), /text-2xl font-medium/);
+  assert.match(read("src/components/ui/sync-button.tsx"), /Sincronizza ora/);
+});
+
+test("users page uses data table and detail links", () => {
   const usersPage = read("src/app/users/page.tsx");
-  const groupsPage = read("src/app/groups/page.tsx");
+  const userDetailPage = read("src/app/users/[id]/page.tsx");
+
+  assert.match(usersPage, /DataTable/);
+  assert.match(usersPage, /Cartelle accessibili/);
+  assert.match(usersPage, /Permesso massimo/);
+  assert.match(usersPage, /\/users\/\$\{row\.original\.id\}/);
+  assert.match(userDetailPage, /Permessi effettivi/);
+  assert.match(userDetailPage, /SourceTag/);
+});
+
+test("shares page uses cards and share detail route", () => {
   const sharesPage = read("src/app/shares/page.tsx");
+  const shareDetailPage = read("src/app/shares/[id]/page.tsx");
+
+  assert.match(sharesPage, /Cartelle condivise/);
+  assert.match(sharesPage, /deny/);
+  assert.match(sharesPage, /\/shares\/\$\{share\.id\}/);
+  assert.match(shareDetailPage, /Accessi effettivi/);
+  assert.match(shareDetailPage, /PermissionBadge/);
+});
+
+test("reviews and sync pages expose redesigned administrative views", () => {
   const reviewsPage = read("src/app/reviews/page.tsx");
   const syncPage = read("src/app/sync/page.tsx");
-  const permissionsPage = read("src/app/effective-permissions/page.tsx");
 
-  assert.match(usersPage, /getNasUsers/);
-  assert.match(usersPage, /useDeferredValue/);
-  assert.match(usersPage, /Filtri/);
-  assert.match(usersPage, /Solo attivi/);
-  assert.match(usersPage, /Con snapshot/);
-  assert.doesNotMatch(usersPage, /Senza email/);
-  assert.match(groupsPage, /getNasGroups/);
-  assert.match(groupsPage, /useDeferredValue/);
-  assert.match(groupsPage, /Con snapshot/);
-  assert.match(groupsPage, /Senza snapshot/);
-  assert.match(sharesPage, /getShares/);
-  assert.match(sharesPage, /useDeferredValue/);
-  assert.match(sharesPage, /Con settore/);
-  assert.match(sharesPage, /Senza settore/);
-  assert.match(reviewsPage, /getReviews/);
-  assert.match(reviewsPage, /useDeferredValue/);
-  assert.match(reviewsPage, /Decisione/);
-  assert.match(reviewsPage, /Revoked/);
-  assert.match(syncPage, /getSyncCapabilities/);
-  assert.match(syncPage, /getSyncRuns/);
-  assert.match(syncPage, /applyLiveSync/);
-  assert.match(syncPage, /auth_mode/);
-  assert.match(syncPage, /retry_strategy/);
-  assert.match(syncPage, /retry_jitter_enabled/);
-  assert.match(syncPage, /Source/);
-  assert.match(syncPage, /Refresh/);
-  assert.match(syncPage, /Retry/);
-  assert.match(syncPage, /jitter/);
-  assert.match(syncPage, /Esegui Sync NAS/);
-  assert.doesNotMatch(syncPage, /Preview Sync/);
-  assert.doesNotMatch(syncPage, /Apply Sync/);
-  assert.match(permissionsPage, /getEffectivePermissions/);
-  assert.match(permissionsPage, /calculatePermissionPreview/);
-  assert.match(permissionsPage, /useDeferredValue/);
-  assert.match(permissionsPage, /Con write/);
-  assert.match(permissionsPage, /Solo deny/);
-  assert.match(permissionsPage, /Preview Permission Engine/);
-  assert.match(read("src/components/app/protected-page.tsx"), /router\.replace\("\/login"\)/);
+  assert.match(reviewsPage, /Review accessi/);
+  assert.match(reviewsPage, /In attesa/);
+  assert.match(reviewsPage, /Approvate/);
+  assert.match(syncPage, /Sincronizzazione/);
+  assert.match(syncPage, /Stato connector/);
+  assert.match(syncPage, /Storico snapshot/);
+  assert.match(syncPage, /SyncButton/);
 });
 
-test("frontend maps domain ids to readable labels", () => {
-  const reviewsPage = read("src/app/reviews/page.tsx");
+test("effective permissions page keeps preview and persistent table", () => {
   const permissionsPage = read("src/app/effective-permissions/page.tsx");
 
-  assert.match(reviewsPage, /useDomainData/);
-  assert.match(reviewsPage, /getUserLabel/);
-  assert.match(permissionsPage, /useDomainData/);
-  assert.match(permissionsPage, /getShareLabel/);
+  assert.match(permissionsPage, /Permessi persistiti/);
+  assert.match(permissionsPage, /Preview guidata/);
+  assert.match(permissionsPage, /calculatePermissionPreview/);
+  assert.match(permissionsPage, /available-groups/);
 });

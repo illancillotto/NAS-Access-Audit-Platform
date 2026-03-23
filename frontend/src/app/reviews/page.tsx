@@ -3,12 +3,24 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { TableFilters } from "@/components/table/table-filters";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
+import { SearchIcon } from "@/components/ui/icons";
 import { useDomainData } from "@/hooks/use-domain-data";
 import { getReviews } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import type { Review } from "@/types/api";
 
 type DecisionFilter = "all" | "approved" | "revoked" | "pending";
+
+const decisionMeta = {
+  approved: { label: "Approvata", variant: "success" as const },
+  revoked: { label: "Revocata", variant: "danger" as const },
+  pending: { label: "In attesa", variant: "warning" as const },
+};
 
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -19,13 +31,15 @@ export default function ReviewsPage() {
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  function getUserLabel(userId: number): string {
-    return users.find((user) => user.id === userId)?.username ?? String(userId);
-  }
+  const userLabelMap = useMemo(
+    () => new Map(users.map((user) => [user.id, user.username])),
+    [users],
+  );
 
-  function getShareLabel(shareId: number): string {
-    return shares.find((share) => share.id === shareId)?.name ?? String(shareId);
-  }
+  const shareLabelMap = useMemo(
+    () => new Map(shares.map((share) => [share.id, share.name])),
+    [shares],
+  );
 
   useEffect(() => {
     async function loadReviews() {
@@ -52,126 +66,98 @@ export default function ReviewsPage() {
       if (!normalizedSearch) return true;
 
       return [
-        getUserLabel(review.nas_user_id),
-        getShareLabel(review.share_id),
+        userLabelMap.get(review.nas_user_id) ?? String(review.nas_user_id),
+        shareLabelMap.get(review.share_id) ?? String(review.share_id),
         review.decision,
         review.note ?? "",
       ].some((value) => value.toLowerCase().includes(normalizedSearch));
     });
-  }, [reviews, deferredSearchTerm, decisionFilter, users, shares]);
-
-  const approvedCount = reviews.filter((review) => review.decision === "approved").length;
-  const revokedCount = reviews.filter((review) => review.decision === "revoked").length;
-  const withNoteCount = reviews.filter((review) => Boolean(review.note)).length;
+  }, [reviews, deferredSearchTerm, decisionFilter, userLabelMap, shareLabelMap]);
 
   return (
     <ProtectedPage
-      title="Review Accessi"
-      description="Monitoraggio review applicative con filtri rapidi su decisione, utente e share."
+      title="Review accessi"
+      description="Coda di validazione per utenti e cartelle con stato decisionale e note operative."
+      breadcrumb="Validazione"
     >
-      {error || domainError ? <p className="status-note error-text">{error ?? domainError}</p> : null}
+      {error || domainError ? <p className="text-sm text-red-600">{error ?? domainError}</p> : null}
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Panoramica</h3>
-            <p className="status-note">Vista sintetica delle review approvate, revocate e annotate.</p>
-          </div>
-          <div className="badge">Record: {filteredReviews.length}/{reviews.length}</div>
-        </div>
-        <div className="panel-grid">
-          <article className="panel">
-            <small>Review totali</small>
-            <div className="metric">{reviews.length}</div>
-          </article>
-          <article className="panel">
-            <small>Approvate</small>
-            <div className="metric">{approvedCount}</div>
-          </article>
-          <article className="panel">
-            <small>Revocate</small>
-            <div className="metric">{revokedCount}</div>
-          </article>
-          <article className="panel">
-            <small>Con nota</small>
-            <div className="metric">{withNoteCount}</div>
-          </article>
-        </div>
-      </article>
+      <div className="surface-grid">
+        <MetricCard label="Review totali" value={reviews.length} sub="Richieste presenti in piattaforma" />
+        <MetricCard label="In attesa" value={reviews.filter((review) => review.decision === "pending").length} sub="Da validare" variant="warning" />
+        <MetricCard label="Approvate" value={reviews.filter((review) => review.decision === "approved").length} sub="Confermate dai reviewer" variant="success" />
+        <MetricCard label="Revocate" value={reviews.filter((review) => review.decision === "revoked").length} sub="Da bonificare" variant="danger" />
+      </div>
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Filtri</h3>
-            <p className="status-note">Ricerca su utente, share, decisione e nota.</p>
-          </div>
+      <article className="panel-card">
+        <div className="mb-4">
+          <p className="section-title">Filtri</p>
+          <p className="section-copy">Ricerca su utente, share, decisione e nota.</p>
         </div>
-        <div className="filter-grid filter-grid-compact">
-          <label>
+        <TableFilters>
+          <label className="text-sm font-medium text-gray-700">
             Cerca
             <input
-              className="text-input"
+              className="form-control mt-1"
               type="text"
-              placeholder="Es. AlessandroPorcu, EmailSaver, approved"
+              placeholder="Es. AlessandroPorcu, EmailSaver, approvata"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </label>
-          <label>
-            Decisione
+          <label className="text-sm font-medium text-gray-700">
+            Stato review
             <select
-              className="select-input"
+              className="form-control mt-1"
               value={decisionFilter}
               onChange={(event) => setDecisionFilter(event.target.value as DecisionFilter)}
             >
               <option value="all">Tutte</option>
-              <option value="approved">Approved</option>
-              <option value="revoked">Revoked</option>
-              <option value="pending">Pending</option>
+              <option value="pending">In attesa</option>
+              <option value="approved">Approvate</option>
+              <option value="revoked">Revocate</option>
             </select>
           </label>
-        </div>
+        </TableFilters>
       </article>
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Elenco Review</h3>
-            <p className="status-note">La decisione è evidenziata per facilitare il triage operativo.</p>
-          </div>
+      {filteredReviews.length === 0 ? (
+        <EmptyState
+          icon={SearchIcon}
+          title="Nessuna review trovata"
+          description="Nessuna review corrisponde ai filtri selezionati."
+        />
+      ) : (
+        <div className="space-y-4">
+          {filteredReviews.map((review) => {
+            const meta = decisionMeta[review.decision as keyof typeof decisionMeta] ?? {
+              label: review.decision,
+              variant: "neutral" as const,
+            };
+
+            return (
+              <article key={review.id} className="panel-card">
+                <div className="flex items-start gap-3">
+                  <Avatar label={userLabelMap.get(review.nas_user_id) ?? String(review.nas_user_id)} />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">{userLabelMap.get(review.nas_user_id) ?? review.nas_user_id}</p>
+                      <span className="text-gray-300">→</span>
+                      <p className="text-sm text-gray-600">{shareLabelMap.get(review.share_id) ?? review.share_id}</p>
+                    </div>
+                    <p className="text-xs text-gray-400">Snapshot #{review.snapshot_id ?? "—"} · Reviewer #{review.reviewer_user_id}</p>
+                  </div>
+                  <Badge variant={meta.variant}>{meta.label}</Badge>
+                </div>
+                <div className="mt-4 border-t border-gray-50 pt-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Note</p>
+                  <p className="mt-2 text-sm text-gray-600">{review.note ?? "Nessuna nota registrata."}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Utente NAS</th>
-              <th>Share</th>
-              <th>Decisione</th>
-              <th>Nota</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredReviews.map((review) => (
-              <tr key={review.id}>
-                <td className="mono">{review.id}</td>
-                <td>{getUserLabel(review.nas_user_id)}</td>
-                <td>{getShareLabel(review.share_id)}</td>
-                <td>
-                  <span className={`status-pill ${review.decision === "approved" ? "status-ok" : "status-warn"}`}>
-                    {review.decision}
-                  </span>
-                </td>
-                <td>{review.note ?? "-"}</td>
-              </tr>
-            ))}
-            {filteredReviews.length === 0 ? (
-              <tr>
-                <td colSpan={5}>Nessuna review corrisponde ai filtri attivi.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </article>
+      )}
     </ProtectedPage>
   );
 }
