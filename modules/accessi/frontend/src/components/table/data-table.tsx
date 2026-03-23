@@ -18,14 +18,16 @@ type DataTableProps<TData> = {
   emptyTitle?: string;
   emptyDescription?: string;
   initialPageSize?: number;
+  onRowClick?: (row: TData) => void;
 };
 
-export function DataTable<TData>({
+export function DataTable<TData extends object>({
   data,
   columns,
   emptyTitle = "Nessun risultato",
   emptyDescription = "Nessun record disponibile per i filtri attivi.",
   initialPageSize = 10,
+  onRowClick,
 }: DataTableProps<TData>) {
   const table = useReactTable({
     data,
@@ -71,7 +73,11 @@ export function DataTable<TData>({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr
+                    key={row.id}
+                    className={onRowClick ? "cursor-pointer transition hover:bg-gray-50 focus-within:bg-gray-50" : undefined}
+                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

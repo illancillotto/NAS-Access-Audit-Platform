@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
+import { AlertBanner } from "@/components/ui/alert-banner";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchIcon } from "@/components/ui/icons";
@@ -12,6 +13,11 @@ import { SourceTag } from "@/components/ui/source-tag";
 import { useDomainData } from "@/hooks/use-domain-data";
 import { getEffectivePermissions, getReviews } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import {
+  getAnomalousPermissions,
+  isMultiSourceAnomaly,
+  parseSourceTokens,
+} from "@/lib/permissions";
 import { getPermissionLevel } from "@/lib/presentation";
 import { cn } from "@/lib/cn";
 import type { EffectivePermission, Review } from "@/types/api";
@@ -62,11 +68,111 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
     () => reviews.filter((review) => review.nas_user_id === userId),
     [reviews, userId],
   );
+  const anomalousPermissions = useMemo(
+    () => getAnomalousPermissions(userPermissions),
+    [userPermissions],
+  );
+  const hasAnomalies = anomalousPermissions.length > 0;
+
+  const groupBadgeMeta = useMemo(() => {
+    const stats = new Map<
+      string,
+      {
+        firstSeenAt: number;
+        lowestLevelRank: number;
+        isSecondary: boolean;
+      }
+    >();
+
+    userPermissions.forEach((permission, permissionIndex) => {
+      const tokens = parseSourceTokens(permission.source_summary);
+      const groupTokens = tokens.filter((token) => token.type === "group");
+
+      groupTokens.forEach((token) => {
+        const existing = stats.get(token.name);
+        const levelRank =
+          token.level.toLowerCase().includes("write")
+            ? 2
+            : token.level.toLowerCase().includes("read")
+              ? 1
+              : 0;
+
+        if (!existing) {
+          stats.set(token.name, {
+            firstSeenAt: permissionIndex,
+            lowestLevelRank: levelRank,
+            isSecondary: false,
+          });
+          return;
+        }
+
+        existing.lowestLevelRank = Math.min(existing.lowestLevelRank, levelRank);
+      });
+
+      if (!permission.can_write) {
+        return;
+      }
+
+      const groupRanks = groupTokens.map((token) => ({
+        name: token.name,
+        rank:
+          token.level.toLowerCase().includes("write")
+            ? 2
+            : token.level.toLowerCase().includes("read")
+              ? 1
+              : 0,
+      }));
+
+      if (groupRanks.length < 2) {
+        return;
+      }
+
+      const minRank = Math.min(...groupRanks.map((token) => token.rank));
+      const maxRank = Math.max(...groupRanks.map((token) => token.rank));
+
+      if (maxRank <= minRank) {
+        return;
+      }
+
+      groupRanks
+        .filter((token) => token.rank === maxRank)
+        .forEach((token) => {
+          const current = stats.get(token.name);
+          if (current) {
+            current.isSecondary = true;
+          }
+        });
+    });
+
+    const orderedGroups = Array.from(stats.entries()).sort((left, right) => {
+      const [, leftMeta] = left;
+      const [, rightMeta] = right;
+
+      if (leftMeta.lowestLevelRank !== rightMeta.lowestLevelRank) {
+        return leftMeta.lowestLevelRank - rightMeta.lowestLevelRank;
+      }
+
+      return leftMeta.firstSeenAt - rightMeta.firstSeenAt;
+    });
+
+    const primaryGroupName = orderedGroups[0]?.[0] ?? null;
+    const secondaryGroupNames = new Set(
+      orderedGroups
+        .filter(([groupName, meta]) => meta.isSecondary && groupName !== primaryGroupName)
+        .map(([groupName]) => groupName),
+    );
+
+    return {
+      orderedGroups,
+      secondaryGroupNames,
+    };
+  }, [userPermissions]);
 
   const guessedGroups = useMemo(() => {
-    const relatedSources = userPermissions.flatMap((permission) => permission.source_summary.split(","));
-    return groups.filter((group) => relatedSources.some((source) => source.includes(`group:${group.name}:`)));
-  }, [groups, userPermissions]);
+    return groupBadgeMeta.orderedGroups
+      .map(([groupName]) => groups.find((group) => group.name === groupName))
+      .filter((group): group is (typeof groups)[number] => Boolean(group));
+  }, [groupBadgeMeta.orderedGroups, groups]);
 
   return (
     <div className="page-stack">
@@ -98,7 +204,10 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
                 <div className="mt-3 flex flex-wrap gap-2">
                   {guessedGroups.length > 0 ? (
                     guessedGroups.map((group) => (
-                      <Badge key={group.id} variant="info">
+                      <Badge
+                        key={group.id}
+                        variant={groupBadgeMeta.secondaryGroupNames.has(group.name) ? "warning" : "info"}
+                      >
                         {group.name}
                       </Badge>
                     ))
@@ -116,7 +225,18 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
           </article>
 
           <article className="panel-card">
-            <div className="mb-4 flex flex-wrap gap-2">
+            {hasAnomalies ? (
+              <AlertBanner title="Permessi da origini multiple rilevati" variant="warning">
+                <p>
+                  {anomalousPermissions.length === 1
+                    ? "1 cartella ha un livello di accesso derivante da un gruppo secondario."
+                    : `${anomalousPermissions.length} cartelle hanno livelli di accesso derivanti da gruppi secondari.`}{" "}
+                  Verificare le origini nella colonna Origine e valutare una review.
+                </p>
+              </AlertBanner>
+            ) : null}
+
+            <div className={cn("flex flex-wrap gap-2", hasAnomalies ? "mt-4 mb-4" : "mb-4")}>
               {([
                 ["permissions", "Permessi effettivi"],
                 ["reviews", "Review"],
@@ -154,20 +274,34 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
                       </tr>
                     </thead>
                     <tbody>
-                      {userPermissions.map((permission) => (
-                        <tr key={permission.id}>
-                          <td>{shares.find((share) => share.id === permission.share_id)?.name ?? permission.share_id}</td>
-                          <td>
-                            <PermissionBadge level={getPermissionLevel(permission)} />
-                          </td>
-                          <td>{permission.can_read ? "✓" : "—"}</td>
-                          <td>{permission.can_write ? "✓" : "—"}</td>
-                          <td>{permission.is_denied ? "✗" : "—"}</td>
-                          <td>
-                            <SourceTag source={permission.source_summary} />
-                          </td>
-                        </tr>
-                      ))}
+                      {userPermissions.map((permission) => {
+                        const isAnomalous = isMultiSourceAnomaly(permission.source_summary);
+
+                        return (
+                          <tr
+                            key={permission.id}
+                            className={isAnomalous ? "bg-amber-50" : undefined}
+                          >
+                            <td>{shares.find((share) => share.id === permission.share_id)?.name ?? permission.share_id}</td>
+                            <td>
+                              <div className="inline-flex items-center">
+                                <PermissionBadge level={getPermissionLevel(permission)} />
+                                {isAnomalous ? (
+                                  <span className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                                    !
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td>{permission.can_read ? "✓" : "—"}</td>
+                            <td>{permission.can_write ? "✓" : "—"}</td>
+                            <td>{permission.is_denied ? "✗" : "—"}</td>
+                            <td>
+                              <SourceTag source={permission.source_summary} expanded={isAnomalous} />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

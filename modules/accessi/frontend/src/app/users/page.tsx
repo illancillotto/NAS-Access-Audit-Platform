@@ -155,17 +155,13 @@ export default function UsersPage() {
         header: "Utente NAS",
         accessorKey: "username",
         cell: ({ row }) => (
-          <button
-            className="flex items-center gap-3 text-left"
-            onClick={() => setSelectedUserId(row.original.id)}
-            type="button"
-          >
+          <div className="flex items-center gap-3">
             <Avatar label={row.original.fullName === "Nome non disponibile" ? row.original.username : row.original.fullName} />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-[#1D4E35]">{row.original.username}</p>
               <p className="truncate text-xs text-gray-400">{row.original.fullName}</p>
             </div>
-          </button>
+          </div>
         ),
       },
       {
@@ -190,19 +186,6 @@ export default function UsersPage() {
           <Badge variant={row.original.isActive ? "success" : "neutral"}>
             {row.original.isActive ? "Attivo" : "Inattivo"}
           </Badge>
-        ),
-      },
-      {
-        header: "Azione",
-        accessorKey: "id",
-        cell: ({ row }) => (
-          <button
-            className="text-sm font-medium text-[#1D4E35]"
-            onClick={() => setSelectedUserId(row.original.id)}
-            type="button"
-          >
-            Apri dettaglio
-          </button>
         ),
       },
     ],
@@ -280,6 +263,7 @@ export default function UsersPage() {
           columns={columns}
           emptyTitle="Nessun utente trovato"
           emptyDescription="Nessun utente corrisponde ai filtri selezionati."
+          onRowClick={(row) => setSelectedUserId(row.id)}
         />
       </article>
 
