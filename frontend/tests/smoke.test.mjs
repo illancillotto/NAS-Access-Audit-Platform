@@ -83,7 +83,8 @@ test("frontend contains real backend-driven pages", () => {
   assert.match(usersPage, /useDeferredValue/);
   assert.match(usersPage, /Filtri/);
   assert.match(usersPage, /Solo attivi/);
-  assert.match(usersPage, /Con email/);
+  assert.match(usersPage, /Con snapshot/);
+  assert.doesNotMatch(usersPage, /Senza email/);
   assert.match(groupsPage, /getNasGroups/);
   assert.match(groupsPage, /useDeferredValue/);
   assert.match(groupsPage, /Con snapshot/);

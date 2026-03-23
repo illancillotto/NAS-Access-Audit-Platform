@@ -8,14 +8,12 @@ import { getStoredAccessToken } from "@/lib/auth";
 import type { NasUser } from "@/types/api";
 
 type ActivityFilter = "all" | "active" | "inactive";
-type EmailFilter = "all" | "with-email" | "without-email";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<NasUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
-  const [emailFilter, setEmailFilter] = useState<EmailFilter>("all");
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -42,25 +40,21 @@ export default function UsersPage() {
       .filter((user) => {
         if (activityFilter === "active" && !user.is_active) return false;
         if (activityFilter === "inactive" && user.is_active) return false;
-        if (emailFilter === "with-email" && !user.email) return false;
-        if (emailFilter === "without-email" && user.email) return false;
 
         if (!normalizedSearch) return true;
 
         const searchableValues = [
           user.username,
           user.full_name ?? "",
-          user.email ?? "",
           user.source_uid ?? "",
         ];
 
         return searchableValues.some((value) => value.toLowerCase().includes(normalizedSearch));
       })
       .sort((left, right) => left.username.localeCompare(right.username, "it"));
-  }, [users, deferredSearchTerm, activityFilter, emailFilter]);
+  }, [users, deferredSearchTerm, activityFilter]);
 
   const activeUsers = users.filter((user) => user.is_active).length;
-  const usersWithEmail = users.filter((user) => Boolean(user.email)).length;
   const filteredOutUsers = users.length - filteredUsers.length;
 
   return (
@@ -88,8 +82,8 @@ export default function UsersPage() {
             <div className="metric">{activeUsers}</div>
           </article>
           <article className="panel">
-            <small>Con email</small>
-            <div className="metric">{usersWithEmail}</div>
+            <small>Con snapshot</small>
+            <div className="metric">{users.filter((user) => user.last_seen_snapshot_id != null).length}</div>
           </article>
           <article className="panel">
             <small>Filtrati fuori</small>
@@ -102,10 +96,10 @@ export default function UsersPage() {
         <div className="panel-header">
           <div>
             <h3>Filtri</h3>
-            <p className="status-note">Ricerca su username, nome completo, email e UID.</p>
+            <p className="status-note">Ricerca su username, nome completo e UID.</p>
           </div>
         </div>
-        <div className="filter-grid">
+        <div className="filter-grid filter-grid-compact">
           <label>
             Cerca
             <input
@@ -128,18 +122,6 @@ export default function UsersPage() {
               <option value="inactive">Solo inattivi</option>
             </select>
           </label>
-          <label>
-            Email
-            <select
-              className="select-input"
-              value={emailFilter}
-              onChange={(event) => setEmailFilter(event.target.value as EmailFilter)}
-            >
-              <option value="all">Tutte</option>
-              <option value="with-email">Con email</option>
-              <option value="without-email">Senza email</option>
-            </select>
-          </label>
         </div>
       </article>
 
@@ -156,7 +138,6 @@ export default function UsersPage() {
           <thead>
             <tr>
               <th>Utente</th>
-              <th>Contatto</th>
               <th>UID</th>
               <th>Snapshot</th>
               <th>Stato</th>
@@ -171,7 +152,6 @@ export default function UsersPage() {
                     <span>{user.full_name ?? "Nome non disponibile"}</span>
                   </div>
                 </td>
-                <td>{user.email ?? "-"}</td>
                 <td className="mono">{user.source_uid ?? "-"}</td>
                 <td className="mono">{user.last_seen_snapshot_id ?? "-"}</td>
                 <td>
@@ -183,7 +163,7 @@ export default function UsersPage() {
             ))}
             {filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={5}>Nessun utente NAS corrisponde ai filtri attivi.</td>
+                <td colSpan={4}>Nessun utente NAS corrisponde ai filtri attivi.</td>
               </tr>
             ) : null}
           </tbody>
