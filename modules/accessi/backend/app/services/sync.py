@@ -1,4 +1,5 @@
 import shlex
+from logging import getLogger
 from hashlib import sha256
 
 from sqlalchemy.orm import Session
@@ -29,6 +30,8 @@ from app.services.nas_parsers import (
 )
 from app.services.permissions import calculate_effective_permissions
 
+logger = getLogger(__name__)
+
 
 def build_sync_preview(payload: SyncPreviewRequest) -> SyncPreviewResponse:
     return SyncPreviewResponse(
@@ -47,8 +50,19 @@ def build_live_sync_payload(client: NasSSHClient | None = None) -> SyncPreviewRe
     active_client = client or get_nas_client()
     passwd_text = active_client.run_command(settings.nas_passwd_command)
     group_text = active_client.run_command(settings.nas_group_command)
-    shares_text = active_client.run_command(settings.nas_shares_command)
-    parsed_shares = parse_share_listing(shares_text)
+    root_shares_text = active_client.run_command(settings.nas_shares_command)
+    parsed_shares = parse_share_listing(root_shares_text)
+
+    if settings.nas_share_subpaths_command.strip():
+        try:
+            parsed_shares = _merge_shares(
+                parsed_shares,
+                _collect_subpath_shares(active_client, parsed_shares),
+            )
+        except Exception:
+            logger.warning("Unable to enumerate NAS subpaths, continuing with root shares only", exc_info=True)
+
+    shares_text = _serialize_share_listing(parsed_shares)
     acl_texts = [
         active_client.run_command(
             settings.nas_acl_command_template.format(share=shlex.quote(share.name))
@@ -73,6 +87,46 @@ def _build_snapshot_checksum(payload: SyncPreviewRequest) -> str:
         ]
     )
     return sha256(raw_payload.encode("utf-8")).hexdigest()
+
+
+def _merge_shares(*share_groups: list[ParsedShare]) -> list[ParsedShare]:
+    merged: list[ParsedShare] = []
+    seen: set[str] = set()
+
+    for share_group in share_groups:
+        for share in share_group:
+            if share.name in seen:
+                continue
+            seen.add(share.name)
+            merged.append(share)
+
+    return merged
+
+
+def _serialize_share_listing(shares: list[ParsedShare]) -> str:
+    if not shares:
+        return ""
+
+    return "\n".join(share.name for share in shares) + "\n"
+
+
+def _collect_subpath_shares(
+    client: NasSSHClient,
+    root_shares: list[ParsedShare],
+) -> list[ParsedShare]:
+    subpath_shares: list[ParsedShare] = []
+
+    for share in root_shares:
+        command = settings.nas_share_subpaths_command.format(share=shlex.quote(share.name))
+        try:
+            subpath_output = client.run_command(command)
+        except Exception:
+            logger.warning("Unable to enumerate NAS subpaths for %s", share.name, exc_info=True)
+            continue
+
+        subpath_shares = _merge_shares(subpath_shares, parse_share_listing(subpath_output))
+
+    return subpath_shares
 
 
 def _normalize_subject(raw_subject: str) -> tuple[str, str] | None:
@@ -141,11 +195,12 @@ def _upsert_group(db: Session, parsed_group: ParsedNasGroup, snapshot_id: int) -
 
 
 def _upsert_share(db: Session, parsed_share: ParsedShare, snapshot_id: int) -> Share:
+    path = f"/volume1/{parsed_share.name}"
     existing = db.query(Share).filter(Share.name == parsed_share.name).one_or_none()
     if existing is None:
         existing = Share(
             name=parsed_share.name,
-            path=f"/volume1/{parsed_share.name}",
+            path=path,
             sector=None,
             description="Importata da sync NAS",
             last_seen_snapshot_id=snapshot_id,
@@ -154,10 +209,41 @@ def _upsert_share(db: Session, parsed_share: ParsedShare, snapshot_id: int) -> S
         db.flush()
         return existing
 
+    existing.path = path
     existing.last_seen_snapshot_id = snapshot_id
     if not existing.description:
         existing.description = "Importata da sync NAS"
     return existing
+
+
+def _infer_parent(child_path: str, all_shares: list[Share]) -> Share | None:
+    best: Share | None = None
+
+    for candidate in all_shares:
+        if candidate.path == child_path:
+            continue
+
+        if child_path.startswith(candidate.path + "/"):
+            if best is None or len(candidate.path) > len(best.path):
+                best = candidate
+
+    return best
+
+
+def _assign_share_parents(db: Session) -> None:
+    all_shares = db.query(Share).all()
+
+    for share in all_shares:
+        try:
+            parent = _infer_parent(share.path, all_shares)
+            parent_id = parent.id if parent else None
+
+            if share.parent_id != parent_id:
+                share.parent_id = parent_id
+        except Exception:
+            logger.warning("Unable to infer parent share for %s", share.path, exc_info=True)
+
+    db.flush()
 
 
 def _build_permission_entries_by_share(
@@ -232,6 +318,7 @@ def apply_sync_payload(db: Session, payload: SyncPreviewRequest) -> SyncApplyRes
         parsed_share.name: _upsert_share(db, parsed_share, snapshot.id)
         for parsed_share in preview.shares
     }
+    _assign_share_parents(db)
 
     permission_entries_input, share_acl_pairs_used = _build_permission_entries_by_share(preview, payload)
 

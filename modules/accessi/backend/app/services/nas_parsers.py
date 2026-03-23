@@ -134,8 +134,20 @@ def _is_human_user(uid: str, home_directory: str) -> bool:
 
 
 def _normalize_share_name(raw_name: str) -> str | None:
-    if raw_name.startswith("@"):
+    normalized = raw_name.strip()
+    if not normalized:
         return None
-    if raw_name.startswith("'") and raw_name.endswith("'") and len(raw_name) >= 2:
-        return raw_name[1:-1]
-    return raw_name
+    if normalized.startswith("'") and normalized.endswith("'") and len(normalized) >= 2:
+        normalized = normalized[1:-1]
+    normalized = normalized.rstrip("/")
+    if normalized == "/volume1":
+        return None
+    if normalized.startswith("/volume1/"):
+        normalized = normalized.removeprefix("/volume1/")
+    if not normalized:
+        return None
+    if normalized.startswith("@") or normalized.startswith("#"):
+        return None
+    if any(segment.startswith("@") or segment.startswith("#") for segment in normalized.split("/")):
+        return None
+    return normalized

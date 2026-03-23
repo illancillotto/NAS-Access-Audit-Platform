@@ -2,8 +2,36 @@ from app.core.config import Settings
 
 
 def test_settings_use_expected_defaults(monkeypatch) -> None:
-    monkeypatch.delenv("BACKEND_CORS_ORIGINS", raising=False)
-    monkeypatch.delenv("BOOTSTRAP_ADMIN_EMAIL", raising=False)
+    for env_name in [
+        "APP_ENV",
+        "BACKEND_PORT",
+        "BACKEND_CORS_ORIGINS",
+        "DATABASE_URL",
+        "NAS_HOST",
+        "NAS_PORT",
+        "NAS_USERNAME",
+        "NAS_TIMEOUT",
+        "NAS_PASSWD_COMMAND",
+        "NAS_GROUP_COMMAND",
+        "NAS_SHARES_COMMAND",
+        "NAS_SHARE_SUBPATHS_COMMAND",
+        "NAS_ACL_COMMAND_TEMPLATE",
+        "JWT_SECRET_KEY",
+        "JWT_EXPIRE_MINUTES",
+        "SYNC_LIVE_MAX_ATTEMPTS",
+        "SYNC_LIVE_RETRY_DELAY_SECONDS",
+        "SYNC_LIVE_BACKOFF_MODE",
+        "SYNC_LIVE_BACKOFF_MULTIPLIER",
+        "SYNC_LIVE_BACKOFF_MAX_DELAY_SECONDS",
+        "SYNC_LIVE_BACKOFF_JITTER_ENABLED",
+        "SYNC_LIVE_BACKOFF_JITTER_RATIO",
+        "SYNC_SCHEDULE_ENABLED",
+        "SYNC_SCHEDULE_INTERVAL_SECONDS",
+        "SYNC_SCHEDULE_MAX_CYCLES",
+        "BOOTSTRAP_ADMIN_USERNAME",
+        "BOOTSTRAP_ADMIN_EMAIL",
+    ]:
+        monkeypatch.delenv(env_name, raising=False)
     settings = Settings(_env_file=None)
 
     assert settings.project_name == "NAS Access Audit Platform"
@@ -22,6 +50,7 @@ def test_settings_use_expected_defaults(monkeypatch) -> None:
     assert settings.nas_passwd_command == "getent passwd"
     assert settings.nas_group_command == "getent group"
     assert settings.nas_shares_command == "ls /volume1"
+    assert settings.nas_share_subpaths_command == "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true"
     assert settings.nas_acl_command_template == "synoacltool -get /volume1/{share}"
     assert settings.sync_live_max_attempts == 3
     assert settings.sync_live_retry_delay_seconds == 2
@@ -46,6 +75,7 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     monkeypatch.setenv("NAS_HOST", "10.10.10.10")
     monkeypatch.setenv("NAS_TIMEOUT", "25")
     monkeypatch.setenv("NAS_SHARES_COMMAND", "ls /shares")
+    monkeypatch.setenv("NAS_SHARE_SUBPATHS_COMMAND", "find /shares/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true")
     monkeypatch.setenv("SYNC_LIVE_MAX_ATTEMPTS", "5")
     monkeypatch.setenv("SYNC_LIVE_BACKOFF_MODE", "exponential")
     monkeypatch.setenv("SYNC_LIVE_BACKOFF_MULTIPLIER", "3")
@@ -64,6 +94,7 @@ def test_settings_allow_environment_override(monkeypatch) -> None:
     assert settings.nas_host == "10.10.10.10"
     assert settings.nas_timeout == 25
     assert settings.nas_shares_command == "ls /shares"
+    assert settings.nas_share_subpaths_command == "find /shares/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true"
     assert settings.sync_live_max_attempts == 5
     assert settings.sync_live_backoff_mode == "exponential"
     assert settings.sync_live_backoff_multiplier == 3

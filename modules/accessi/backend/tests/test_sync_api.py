@@ -266,6 +266,7 @@ def test_build_live_sync_payload_quotes_share_names(monkeypatch) -> None:
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
+    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
         "synoacltool -get /volume1/{share}",
@@ -274,7 +275,7 @@ def test_build_live_sync_payload_quotes_share_names(monkeypatch) -> None:
     client = FakeClient()
     payload = build_live_sync_payload(client)
 
-    assert payload.shares_text == "'PROGETTO ADDUTTORE DX'\n"
+    assert payload.shares_text == "PROGETTO ADDUTTORE DX\n"
     assert client.commands[-1] == "synoacltool -get /volume1/'PROGETTO ADDUTTORE DX'"
 
 

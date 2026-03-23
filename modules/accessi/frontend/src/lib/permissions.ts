@@ -1,10 +1,17 @@
-import type { EffectivePermission } from "@/types/api";
+import type { EffectivePermission, Share } from "@/types/api";
 
 export type SourceToken = {
   type: "user" | "group";
   name: string;
   level: string;
   effect: "allow" | "deny";
+};
+
+export type PermissionTreeNode = {
+  permission: EffectivePermission;
+  share: Share;
+  depth: number;
+  parentPermission: EffectivePermission | null;
 };
 
 const TOKEN_PATTERN = /^(user|group):([^:]+):([^:]+):(allow|deny)$/;
@@ -145,4 +152,66 @@ export function getHighestPrioritySourceIndexes(sourceSummary: string): number[]
   return candidates
     .filter(({ token }) => getLevelRank(token.level) === highestRank)
     .map(({ index }) => index);
+}
+
+export function buildPermissionTree(
+  permissions: EffectivePermission[],
+  shares: Share[],
+): PermissionTreeNode[] {
+  const shareMap = new Map(shares.map((share) => [share.id, share]));
+  const permissionMap = new Map(permissions.map((permission) => [permission.share_id, permission]));
+
+  function getDepth(shareId: number, visited = new Set<number>()): number {
+    if (visited.has(shareId)) {
+      return 0;
+    }
+
+    visited.add(shareId);
+    const share = shareMap.get(shareId);
+
+    if (!share?.parent_id) {
+      return 0;
+    }
+
+    return 1 + getDepth(share.parent_id, visited);
+  }
+
+  return permissions
+    .map((permission) => {
+      const share = shareMap.get(permission.share_id);
+
+      if (!share) {
+        return null;
+      }
+
+      const parentShare = share.parent_id ? shareMap.get(share.parent_id) : null;
+      const parentPermission = parentShare ? permissionMap.get(parentShare.id) ?? null : null;
+
+      return {
+        permission,
+        share,
+        depth: getDepth(permission.share_id),
+        parentPermission,
+      };
+    })
+    .filter((node): node is PermissionTreeNode => node !== null)
+    .sort((left, right) => left.share.path.localeCompare(right.share.path, "it"));
+}
+
+export function isEscalation(node: PermissionTreeNode): boolean {
+  const { permission, parentPermission } = node;
+
+  if (!parentPermission) {
+    return false;
+  }
+
+  if (permission.can_write && !parentPermission.can_write) {
+    return true;
+  }
+
+  if ((permission.can_read || permission.can_write) && parentPermission.is_denied) {
+    return true;
+  }
+
+  return false;
 }

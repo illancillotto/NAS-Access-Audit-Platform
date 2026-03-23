@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     nas_passwd_command: str = Field(default="getent passwd", alias="NAS_PASSWD_COMMAND")
     nas_group_command: str = Field(default="getent group", alias="NAS_GROUP_COMMAND")
     nas_shares_command: str = Field(default="ls /volume1", alias="NAS_SHARES_COMMAND")
+    nas_share_subpaths_command: str = Field(
+        default="find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true",
+        alias="NAS_SHARE_SUBPATHS_COMMAND",
+    )
     nas_acl_command_template: str = Field(
         default="synoacltool -get /volume1/{share}",
         alias="NAS_ACL_COMMAND_TEMPLATE",

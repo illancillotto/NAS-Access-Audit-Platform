@@ -39,6 +39,7 @@ class ShareResponse(BaseModel):
     id: int
     name: str
     path: str
+    parent_id: int | None
     sector: str | None
     description: str | None
     last_seen_snapshot_id: int | None

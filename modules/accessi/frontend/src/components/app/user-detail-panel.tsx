@@ -14,7 +14,9 @@ import { useDomainData } from "@/hooks/use-domain-data";
 import { getEffectivePermissions, getReviews } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
+  buildPermissionTree,
   getAnomalousPermissions,
+  isEscalation,
   isMultiSourceAnomaly,
   parseSourceTokens,
 } from "@/lib/permissions";
@@ -73,6 +75,10 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
     [userPermissions],
   );
   const hasAnomalies = anomalousPermissions.length > 0;
+  const permissionTree = useMemo(
+    () => buildPermissionTree(userPermissions, shares),
+    [shares, userPermissions],
+  );
 
   const groupBadgeMeta = useMemo(() => {
     const stats = new Map<
@@ -274,18 +280,42 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
                       </tr>
                     </thead>
                     <tbody>
-                      {userPermissions.map((permission) => {
+                      {permissionTree.map((node) => {
+                        const { permission, share } = node;
                         const isAnomalous = isMultiSourceAnomaly(permission.source_summary);
+                        const hasEscalation = isEscalation(node);
 
                         return (
                           <tr
                             key={permission.id}
                             className={isAnomalous ? "bg-amber-50" : undefined}
                           >
-                            <td>{shares.find((share) => share.id === permission.share_id)?.name ?? permission.share_id}</td>
+                            <td>
+                              <div
+                                className="flex items-center gap-1"
+                                style={{ paddingLeft: `${node.depth * 16}px` }}
+                              >
+                                {node.depth > 0 ? (
+                                  <span className="select-none text-gray-300">↳</span>
+                                ) : null}
+                                <span
+                                  className={node.depth > 0 ? "text-sm text-gray-700" : "text-sm font-medium text-gray-900"}
+                                >
+                                  {share.name}
+                                </span>
+                              </div>
+                            </td>
                             <td>
                               <div className="inline-flex items-center">
                                 <PermissionBadge level={getPermissionLevel(permission)} />
+                                {hasEscalation ? (
+                                  <span
+                                    title="Livello di accesso superiore alla cartella padre. Verificare l'origine."
+                                    className="ml-1 inline-flex cursor-help items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700"
+                                  >
+                                    ↑
+                                  </span>
+                                ) : null}
                                 {isAnomalous ? (
                                   <span className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
                                     !

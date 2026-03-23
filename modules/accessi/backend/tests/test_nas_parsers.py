@@ -57,6 +57,20 @@ def test_parse_share_listing_skips_synology_internal_paths_and_keeps_spaces() ->
     assert [share.name for share in shares] == ["Settore Affari Legali", "EmailSaver"]
 
 
+def test_parse_share_listing_accepts_nested_absolute_paths() -> None:
+    shares = parse_share_listing(
+        "/volume1/Settore Catasto\n"
+        "/volume1/Settore Catasto/Elaborazioni\n"
+        "/volume1/@eaDir\n"
+        "/volume1/Settore Catasto/#recycle\n"
+    )
+
+    assert [share.name for share in shares] == [
+        "Settore Catasto",
+        "Settore Catasto/Elaborazioni",
+    ]
+
+
 def test_parse_acl_output_extracts_allow_and_deny_entries() -> None:
     raw = "allow: group:amministrazione:read,write\ndeny: user:ospite:read\n"
     acl_entries = parse_acl_output(raw)

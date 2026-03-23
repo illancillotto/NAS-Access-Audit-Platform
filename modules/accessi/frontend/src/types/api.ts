@@ -41,6 +41,7 @@ export type Share = {
   id: number;
   name: string;
   path: string;
+  parent_id: number | null;
   sector: string | null;
   description: string | null;
   last_seen_snapshot_id: number | null;
