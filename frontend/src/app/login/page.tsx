@@ -17,6 +17,12 @@ const modules = [
     tone: "active" as const,
   },
   {
+    name: "GAIA Catasto",
+    subtitle: "Servizi AdE",
+    status: "Operativo",
+    tone: "active" as const,
+  },
+  {
     name: "GAIA Rete",
     subtitle: "Network Monitor",
     status: "In sviluppo",
@@ -39,7 +45,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (getStoredAccessToken()) {
-      router.replace("/accessi");
+      router.replace("/");
     }
   }, [router]);
 
@@ -51,7 +57,7 @@ export default function LoginPage() {
     try {
       const response = await login(username, password);
       setStoredAccessToken(response.access_token);
-      router.push("/accessi");
+      router.push("/");
       router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Accesso non riuscito");
@@ -84,8 +90,8 @@ export default function LoginPage() {
                 Entra nella piattaforma GAIA
               </h1>
               <p className="mt-5 max-w-xl text-base leading-7 text-white/72">
-                Un unico punto di ingresso per audit accessi, monitoraggio rete e inventario IT.
-                Il modulo GAIA Accessi è operativo; gli altri moduli sono già predisposti nello scaffold applicativo.
+                Un unico punto di ingresso per audit accessi, servizi catastali, monitoraggio rete e inventario IT.
+                I moduli GAIA Accessi e GAIA Catasto sono operativi; gli altri moduli sono gia predisposti nello scaffold applicativo.
               </p>
             </div>
 
@@ -185,8 +191,8 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 rounded-2xl border border-gray-100 bg-[#F6F7F2] px-4 py-3 text-xs leading-5 text-gray-500">
-            Dopo il login verrai indirizzato a <span className="font-semibold text-[#1D4E35]">GAIA Accessi</span>,
-            il modulo attualmente operativo.
+            Dopo il login verrai indirizzato alla <span className="font-semibold text-[#1D4E35]">home GAIA</span>,
+            da cui potrai aprire i moduli operativi Accessi e Catasto.
           </div>
         </section>
       </section>

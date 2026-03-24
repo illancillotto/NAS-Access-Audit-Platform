@@ -65,7 +65,7 @@ const modules: HomeModule[] = [
     href: "/catasto",
     status: "active",
     statusLabel: "Operativo",
-    accentClassName: "border-[#7A3E0B]/20 bg-white/65 text-gray-900",
+    accentClassName: "border-[#7A3E0B]/20 bg-[#FFF7ED] text-gray-900 shadow-[0_24px_64px_rgba(122,62,11,0.12)]",
   },
 ];
 
@@ -159,7 +159,7 @@ export default function HomePage() {
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70 sm:text-base">
               Piattaforma IT governance del Consorzio di Bonifica dell&apos;Oristanese. Un unico punto di ingresso
-              per audit accessi, monitoraggio rete e inventario dispositivi.
+              per audit accessi, servizi catastali, monitoraggio rete e inventario dispositivi.
             </p>
           </div>
 
@@ -190,7 +190,7 @@ export default function HomePage() {
                 <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Seleziona il dominio operativo</h2>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
-                Accessi sincronizzati: <span className="font-semibold text-white">{summary.nas_users}</span>
+                Moduli operativi: <span className="font-semibold text-white">2</span>
                 {" · "}
                 Review aperte: <span className="font-semibold text-white">{summary.reviews}</span>
               </div>
@@ -242,6 +242,17 @@ export default function HomePage() {
                         <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
                           <p className="text-xs uppercase tracking-[0.16em] text-white/55">Sync run</p>
                           <p className="mt-2 text-2xl font-semibold text-white">{summary.sync_runs}</p>
+                        </div>
+                      </div>
+                    ) : moduleItem.id === "catasto" ? (
+                      <div className="mt-8 grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-[#7A3E0B]/10 bg-white/70 p-4">
+                          <p className="text-xs uppercase tracking-[0.16em] text-[#7A3E0B]/70">Flusso</p>
+                          <p className="mt-2 text-sm font-semibold text-[#7A3E0B]">Batch e visure singole</p>
+                        </div>
+                        <div className="rounded-2xl border border-[#7A3E0B]/10 bg-white/70 p-4">
+                          <p className="text-xs uppercase tracking-[0.16em] text-[#7A3E0B]/70">Output</p>
+                          <p className="mt-2 text-sm font-semibold text-[#7A3E0B]">PDF, ZIP e archivio</p>
                         </div>
                       </div>
                     ) : (

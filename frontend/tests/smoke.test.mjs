@@ -33,11 +33,17 @@ test("frontend api client defaults to same-origin api base", () => {
 
 test("dashboard keeps login gate and GAIA module selector copy", () => {
   const homePage = read("src/app/page.tsx");
+  const loginPage = read("src/app/login/page.tsx");
 
   assert.match(homePage, /router\.replace\("\/login"\)/);
   assert.match(homePage, /Gestione Apparati Informativi e Accessi/);
   assert.match(homePage, /Seleziona il dominio operativo/);
   assert.match(homePage, /GAIA Catasto/);
+  assert.match(homePage, /servizi catastali/);
+  assert.match(loginPage, /router\.replace\("\/"\)/);
+  assert.match(loginPage, /router\.push\("\/"\)/);
+  assert.match(loginPage, /GAIA Catasto/);
+  assert.match(loginPage, /home GAIA/);
 });
 
 test("layout includes app shell, sidebar and topbar", () => {
