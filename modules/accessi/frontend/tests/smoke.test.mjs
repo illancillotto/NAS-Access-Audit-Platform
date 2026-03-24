@@ -20,6 +20,7 @@ test("frontend package exposes core scripts and redesign dependencies", () => {
   assert.ok(pkg.scripts.dev);
   assert.ok(pkg.scripts.build);
   assert.ok(pkg.dependencies["@tanstack/react-table"]);
+  assert.ok(pkg.dependencies["react-hook-form"]);
   assert.ok(pkg.devDependencies.tailwindcss);
   assert.ok(pkg.dependencies.clsx);
 });
@@ -30,13 +31,13 @@ test("frontend api client defaults to same-origin api base", () => {
   assert.match(apiClient, /const DEFAULT_API_BASE_URL = "\/api"/);
 });
 
-test("dashboard keeps login gate and redesigned dashboard copy", () => {
+test("dashboard keeps login gate and GAIA module selector copy", () => {
   const homePage = read("src/app/page.tsx");
 
   assert.match(homePage, /router\.replace\("\/login"\)/);
-  assert.match(homePage, /Controllo centralizzato degli accessi NAS/);
-  assert.match(homePage, /review in attesa/);
-  assert.match(homePage, /Permessi effettivi recenti/);
+  assert.match(homePage, /Gestione Apparati Informativi e Accessi/);
+  assert.match(homePage, /Seleziona il dominio operativo/);
+  assert.match(homePage, /GAIA Catasto/);
 });
 
 test("layout includes app shell, sidebar and topbar", () => {
@@ -49,8 +50,39 @@ test("layout includes app shell, sidebar and topbar", () => {
   assert.match(sidebar, /Consorzio di Bonifica/);
   assert.match(sidebar, /Oristanese — Synology NAS/);
   assert.match(sidebar, /Review accessi/);
+  assert.match(sidebar, /Dashboard Catasto/);
+  assert.match(sidebar, /Visura singola/);
+  assert.match(sidebar, /Archivio documenti/);
+  assert.match(sidebar, /Credenziali SISTER/);
   assert.match(topbar, /StatusPill/);
   assert.match(statusPill, /Backend connesso/);
+});
+
+test("catasto pages wire api client and realtime workflow", () => {
+  const dashboardPage = read("src/app/catasto/page.tsx");
+  const settingsPage = read("src/app/catasto/settings/page.tsx");
+  const newBatchPage = read("src/app/catasto/new-batch/page.tsx");
+  const newSinglePage = read("src/app/catasto/new-single/page.tsx");
+  const batchDetailPage = read("src/app/catasto/batches/[id]/page.tsx");
+  const documentsPage = read("src/app/catasto/documents/page.tsx");
+  const documentDetailPage = read("src/app/catasto/documents/[id]/page.tsx");
+
+  assert.match(dashboardPage, /GAIA Catasto/);
+  assert.match(settingsPage, /Credenziali SISTER/);
+  assert.match(settingsPage, /testCatastoCredentials/);
+  assert.match(settingsPage, /getCatastoCredentialTest/);
+  assert.match(settingsPage, /createCatastoCredentialTestWebSocket/);
+  assert.match(newBatchPage, /createCatastoBatch/);
+  assert.match(newBatchPage, /startCatastoBatch/);
+  assert.match(newSinglePage, /useForm/);
+  assert.match(newSinglePage, /createCatastoSingleVisura/);
+  assert.match(batchDetailPage, /createCatastoBatchWebSocket/);
+  assert.match(batchDetailPage, /CaptchaDialog/);
+  assert.match(batchDetailPage, /fetchCatastoCaptchaImageBlob/);
+  assert.match(documentsPage, /DataTable/);
+  assert.match(documentsPage, /getCatastoDocuments/);
+  assert.match(documentDetailPage, /downloadCatastoDocumentBlob/);
+  assert.match(documentDetailPage, /iframe/);
 });
 
 test("shared ui components exist for redesign system", () => {
@@ -68,9 +100,10 @@ test("users page uses data table and detail links", () => {
   assert.match(usersPage, /DataTable/);
   assert.match(usersPage, /Cartelle accessibili/);
   assert.match(usersPage, /Permesso massimo/);
-  assert.match(usersPage, /\/users\/\$\{row\.original\.id\}/);
-  assert.match(userDetailPage, /Permessi effettivi/);
-  assert.match(userDetailPage, /SourceTag/);
+  assert.match(usersPage, /Apri pagina completa/);
+  assert.match(usersPage, /href=\{`\/users\/\$\{selectedUserId\}`\}/);
+  assert.match(userDetailPage, /Dettaglio utente/);
+  assert.match(userDetailPage, /UserDetailPanel/);
 });
 
 test("shares page uses cards and share detail route", () => {

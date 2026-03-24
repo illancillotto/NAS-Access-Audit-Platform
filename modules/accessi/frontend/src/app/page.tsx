@@ -56,6 +56,17 @@ const modules: HomeModule[] = [
     statusLabel: "In sviluppo",
     accentClassName: "border-[#E07A5F]/20 bg-white/65 text-gray-900",
   },
+  {
+    id: "catasto",
+    title: "GAIA Catasto",
+    subtitle: "Servizi AdE",
+    description:
+      "Integrazione con SISTER per download visure catastali, batch CSV, gestione CAPTCHA e archivio documentale.",
+    href: "/catasto",
+    status: "active",
+    statusLabel: "Operativo",
+    accentClassName: "border-[#7A3E0B]/20 bg-white/65 text-gray-900",
+  },
 ];
 
 const emptySummary: DashboardSummary = {

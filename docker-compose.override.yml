@@ -3,6 +3,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./modules/accessi/backend:/app
+      - catasto-data:/data/catasto
     ports:
       - "${BACKEND_PORT:-8000}:8000"
 
@@ -20,3 +21,13 @@ services:
   postgres:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+
+  catasto-worker:
+    command: python /app/worker/worker.py
+    volumes:
+      - ./modules/catasto/worker:/app/worker
+      - ./modules/accessi/backend:/app/backend
+      - catasto-data:/data/catasto
+
+volumes:
+  catasto-data:

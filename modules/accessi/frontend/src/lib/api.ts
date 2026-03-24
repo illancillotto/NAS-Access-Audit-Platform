@@ -1,4 +1,16 @@
 import type {
+  CatastoBatch,
+  CatastoBatchDetail,
+  CatastoDocument,
+  CatastoBatchWebSocketEvent,
+  CatastoComune,
+  CatastoCredential,
+  CatastoCredentialTestResult,
+  CatastoCredentialTestWebSocketEvent,
+  CatastoCredentialStatus,
+  CatastoOperationResponse,
+  CatastoSingleVisuraPayload,
+  CatastoVisuraRequest,
   CurrentUser,
   DashboardSummary,
   EffectivePermission,
@@ -20,16 +32,28 @@ import type {
 
 const DEFAULT_API_BASE_URL = "/api";
 
-function getApiBaseUrl(): string {
+export class ApiError extends Error {
+  detailData: unknown;
+
+  constructor(message: string, detailData?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.detailData = detailData;
+  }
+}
+
+export function getApiBaseUrl(): string {
   const value = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
   return value.replace(/\/+$/, "");
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
@@ -37,18 +61,88 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let detail = "Request failed";
+    let detailData: unknown;
 
     try {
-      const payload = (await response.json()) as { detail?: string };
-      detail = payload.detail ?? detail;
+      const payload = (await response.json()) as { detail?: unknown };
+      detailData = payload.detail;
+
+      if (typeof payload.detail === "string") {
+        detail = payload.detail;
+      } else if (
+        payload.detail &&
+        typeof payload.detail === "object" &&
+        "message" in payload.detail &&
+        typeof payload.detail.message === "string"
+      ) {
+        detail = payload.detail.message;
+      } else if (payload.detail != null) {
+        detail = JSON.stringify(payload.detail);
+      }
     } catch {
       detail = response.statusText || detail;
     }
 
-    throw new Error(detail);
+    throw new ApiError(detail, detailData);
   }
 
   return (await response.json()) as T;
+}
+
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let detail = "Request failed";
+
+    try {
+      const payload = (await response.json()) as { detail?: unknown };
+      if (typeof payload.detail === "string") {
+        detail = payload.detail;
+      }
+    } catch {
+      detail = response.statusText || detail;
+    }
+
+    throw new ApiError(detail);
+  }
+
+  return response.blob();
+}
+
+function createQueryString(params: Record<string, string | undefined>): string {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value && value.trim().length > 0) {
+      searchParams.set(key, value.trim());
+    }
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+export function getWebSocketBaseUrl(): string {
+  const apiBaseUrl = getApiBaseUrl();
+
+  if (apiBaseUrl.startsWith("https://")) {
+    return apiBaseUrl.replace("https://", "wss://");
+  }
+
+  if (apiBaseUrl.startsWith("http://")) {
+    return apiBaseUrl.replace("http://", "ws://");
+  }
+
+  if (typeof window === "undefined") {
+    return apiBaseUrl;
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}${apiBaseUrl}`;
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
@@ -184,3 +278,233 @@ export async function calculatePermissionPreview(
     }),
   });
 }
+
+export async function getCatastoCredentials(token: string): Promise<CatastoCredentialStatus> {
+  return request<CatastoCredentialStatus>("/catasto/credentials", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function saveCatastoCredentials(
+  token: string,
+  payload: {
+    sister_username: string;
+    sister_password: string;
+    convenzione?: string;
+    codice_richiesta?: string;
+    ufficio_provinciale?: string;
+  },
+): Promise<CatastoCredential> {
+  return request<CatastoCredential>("/catasto/credentials", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteCatastoCredentials(token: string): Promise<CatastoOperationResponse> {
+  return request<CatastoOperationResponse>("/catasto/credentials", {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function testCatastoCredentials(
+  token: string,
+  payload?: {
+    sister_username: string;
+    sister_password: string;
+    convenzione?: string;
+    codice_richiesta?: string;
+    ufficio_provinciale?: string;
+  },
+): Promise<CatastoCredentialTestResult> {
+  return request<CatastoCredentialTestResult>("/catasto/credentials/test", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: payload ? JSON.stringify(payload) : undefined,
+  });
+}
+
+export async function getCatastoCredentialTest(
+  token: string,
+  testId: string,
+): Promise<CatastoCredentialTestResult> {
+  return request<CatastoCredentialTestResult>(`/catasto/credentials/test/${testId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function createCatastoCredentialTestWebSocket(testId: string, token: string): WebSocket | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const url = new URL(`${getWebSocketBaseUrl()}/catasto/ws/credentials-test/${testId}`);
+  url.searchParams.set("token", token);
+  return new WebSocket(url.toString());
+}
+
+export async function getCatastoComuni(token: string, search?: string): Promise<CatastoComune[]> {
+  const query = createQueryString({ search });
+  return request<CatastoComune[]>(`/catasto/comuni${query}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function createCatastoBatch(
+  token: string,
+  file: File,
+  name?: string,
+): Promise<CatastoBatchDetail> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (name) {
+    formData.append("name", name);
+  }
+
+  return request<CatastoBatchDetail>("/catasto/batches", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+}
+
+export async function getCatastoBatches(token: string, status?: string): Promise<CatastoBatch[]> {
+  const query = createQueryString({ status });
+  return request<CatastoBatch[]>(`/catasto/batches${query}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getCatastoBatch(token: string, batchId: string): Promise<CatastoBatchDetail> {
+  return request<CatastoBatchDetail>(`/catasto/batches/${batchId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function startCatastoBatch(token: string, batchId: string): Promise<CatastoBatch> {
+  return request<CatastoBatch>(`/catasto/batches/${batchId}/start`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function createCatastoSingleVisura(
+  token: string,
+  payload: CatastoSingleVisuraPayload,
+): Promise<CatastoBatchDetail> {
+  return request<CatastoBatchDetail>("/catasto/visure", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getPendingCatastoCaptcha(token: string): Promise<CatastoVisuraRequest[]> {
+  return request<CatastoVisuraRequest[]>("/catasto/captcha/pending", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function solveCatastoCaptcha(
+  token: string,
+  requestId: string,
+  text: string,
+): Promise<CatastoVisuraRequest> {
+  return request<CatastoVisuraRequest>(`/catasto/captcha/${requestId}/solve`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function skipCatastoCaptcha(token: string, requestId: string): Promise<CatastoVisuraRequest> {
+  return request<CatastoVisuraRequest>(`/catasto/captcha/${requestId}/skip`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getCatastoDocuments(
+  token: string,
+  filters?: {
+    comune?: string;
+    foglio?: string;
+    particella?: string;
+    created_from?: string;
+    created_to?: string;
+  },
+): Promise<CatastoDocument[]> {
+  const query = createQueryString(filters ?? {});
+  return request<CatastoDocument[]>(`/catasto/documents${query}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getCatastoDocument(token: string, documentId: string): Promise<CatastoDocument> {
+  return request<CatastoDocument>(`/catasto/documents/${documentId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchCatastoCaptchaImageBlob(token: string, requestId: string): Promise<Blob> {
+  return requestBlob(`/catasto/captcha/${requestId}/image`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function downloadCatastoDocumentBlob(token: string, documentId: string): Promise<Blob> {
+  return requestBlob(`/catasto/documents/${documentId}/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function createCatastoBatchWebSocket(batchId: string, token: string): WebSocket | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const url = new URL(`${getWebSocketBaseUrl()}/catasto/ws/${batchId}`);
+  url.searchParams.set("token", token);
+  return new WebSocket(url.toString());
+}
+
+export type { CatastoBatchWebSocketEvent };
+export type { CatastoCredentialTestWebSocketEvent };

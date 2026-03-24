@@ -49,6 +49,14 @@ export function Sidebar({ currentUser, onLogout, reviewBadge = 0, userBadge = 0 
         <p className="px-2 pb-1 pt-4 text-[10px] font-medium uppercase tracking-widest text-gray-400">Validazione</p>
         <NavItem href="/reviews" icon={CheckIcon} label="Review accessi" badge={reviewBadge || undefined} badgeVariant="danger" />
         <NavItem href="/reports" icon={DocumentIcon} label="Report" />
+
+        <p className="px-2 pb-1 pt-4 text-[10px] font-medium uppercase tracking-widest text-gray-400">Catasto</p>
+        <NavItem href="/catasto" icon={GridIcon} label="Dashboard Catasto" />
+        <NavItem href="/catasto/new-single" icon={UserIcon} label="Visura singola" />
+        <NavItem href="/catasto/new-batch" icon={RefreshIcon} label="Nuovo batch" />
+        <NavItem href="/catasto/batches" icon={DocumentIcon} label="Storico batch" />
+        <NavItem href="/catasto/documents" icon={FolderIcon} label="Archivio documenti" />
+        <NavItem href="/catasto/settings" icon={LockIcon} label="Credenziali SISTER" />
       </nav>
 
       <div className="border-t border-gray-100 px-4 py-3">

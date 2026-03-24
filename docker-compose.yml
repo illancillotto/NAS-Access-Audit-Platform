@@ -22,6 +22,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    volumes:
+      - catasto-data:/data/catasto
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,5 +80,20 @@ services:
       timeout: 5s
       retries: 3
 
+  catasto-worker:
+    build:
+      context: .
+      dockerfile: ./modules/catasto/worker/Dockerfile
+    container_name: gaia-catasto-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - catasto-data:/data/catasto
+
 volumes:
   postgres_data:
+  catasto-data:

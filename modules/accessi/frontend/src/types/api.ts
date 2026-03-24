@@ -172,3 +172,168 @@ export type EffectivePermissionPreview = {
   is_denied: boolean;
   source_summary: string;
 };
+
+export type CatastoCredential = {
+  id: string;
+  user_id: number;
+  sister_username: string;
+  convenzione: string | null;
+  codice_richiesta: string | null;
+  ufficio_provinciale: string;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CatastoCredentialStatus = {
+  configured: boolean;
+  credential: CatastoCredential | null;
+};
+
+export type CatastoCredentialTestResult = {
+  id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  success: boolean | null;
+  mode: string | null;
+  reachable: boolean | null;
+  authenticated: boolean | null;
+  message: string | null;
+  verified_at: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export type CatastoCredentialTestWebSocketEvent = {
+  type: "credentials_test";
+  test: CatastoCredentialTestResult;
+};
+
+export type CatastoSingleVisuraPayload = {
+  comune: string;
+  catasto: string;
+  sezione?: string;
+  foglio: string;
+  particella: string;
+  subalterno?: string;
+  tipo_visura: string;
+};
+
+export type CatastoComune = {
+  id: number;
+  nome: string;
+  codice_sister: string;
+  ufficio: string;
+};
+
+export type CatastoRequestStatus =
+  | "pending"
+  | "processing"
+  | "awaiting_captcha"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export type CatastoVisuraRequest = {
+  id: string;
+  batch_id: string;
+  user_id: number;
+  row_index: number;
+  comune: string;
+  comune_codice: string | null;
+  catasto: string;
+  sezione: string | null;
+  foglio: string;
+  particella: string;
+  subalterno: string | null;
+  tipo_visura: string;
+  status: CatastoRequestStatus;
+  current_operation: string | null;
+  error_message: string | null;
+  attempts: number;
+  captcha_image_path: string | null;
+  captcha_requested_at: string | null;
+  captcha_expires_at: string | null;
+  captcha_skip_requested: boolean;
+  document_id: string | null;
+  created_at: string;
+  processed_at: string | null;
+};
+
+export type CatastoBatch = {
+  id: string;
+  user_id: number;
+  name: string | null;
+  status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+  total_items: number;
+  completed_items: number;
+  failed_items: number;
+  skipped_items: number;
+  source_filename: string | null;
+  current_operation: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export type CatastoBatchDetail = CatastoBatch & {
+  requests: CatastoVisuraRequest[];
+};
+
+export type CatastoDocument = {
+  id: string;
+  user_id: number;
+  request_id: string | null;
+  batch_id: string | null;
+  comune: string;
+  foglio: string;
+  particella: string;
+  subalterno: string | null;
+  catasto: string;
+  tipo_visura: string;
+  filename: string;
+  file_size: number | null;
+  codice_fiscale: string | null;
+  created_at: string;
+};
+
+export type CatastoOperationResponse = {
+  success: boolean;
+  message: string;
+};
+
+export type CatastoBatchProgressEvent = {
+  type: "progress";
+  status: string;
+  completed: number;
+  failed: number;
+  skipped: number;
+  total: number;
+  current: string | null;
+};
+
+export type CatastoBatchCaptchaEvent = {
+  type: "captcha_needed";
+  request_id: string;
+  image_url: string;
+};
+
+export type CatastoBatchCompletedEvent = {
+  type: "batch_completed";
+  status: string;
+  ok: number;
+  failed: number;
+  skipped: number;
+};
+
+export type CatastoVisuraCompletedEvent = {
+  type: "visura_completed";
+  request_id: string;
+  document_id: string;
+};
+
+export type CatastoBatchWebSocketEvent =
+  | CatastoBatchProgressEvent
+  | CatastoBatchCaptchaEvent
+  | CatastoBatchCompletedEvent
+  | CatastoVisuraCompletedEvent;
