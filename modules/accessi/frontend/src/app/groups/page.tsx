@@ -8,13 +8,22 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SearchIcon, UsersIcon } from "@/components/ui/icons";
-import { getNasGroups } from "@/lib/api";
+import { getEffectivePermissions, getNasGroups } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { cn } from "@/lib/cn";
-import type { NasGroup } from "@/types/api";
+import type { EffectivePermission, NasGroup } from "@/types/api";
 
 type SnapshotFilter = "all" | "with-snapshot" | "without-snapshot";
 type GroupScopeFilter = "operational" | "all";
+
+const SYNOLOGY_SERVICE_GROUPS = new Set([
+  "myds",
+  "payment",
+  "http",
+  "filestation",
+  "hybridsharesystem",
+  "postfix",
+]);
 
 const SYSTEM_GROUP_NAME_PATTERNS = [
   /^avahi$/i,
@@ -64,12 +73,18 @@ function isSystemGroup(group: NasGroup): boolean {
   return SYSTEM_GROUP_NAME_PATTERNS.some((pattern) => pattern.test(normalizedName));
 }
 
+function isSynologyServiceGroup(group: NasGroup): boolean {
+  return SYNOLOGY_SERVICE_GROUPS.has(group.name.trim().toLowerCase());
+}
+
 export default function GroupsPage() {
   const [groups, setGroups] = useState<NasGroup[]>([]);
+  const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [snapshotFilter, setSnapshotFilter] = useState<SnapshotFilter>("all");
   const [scopeFilter, setScopeFilter] = useState<GroupScopeFilter>("operational");
+  const [showSynologyServiceGroups, setShowSynologyServiceGroups] = useState(false);
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -79,7 +94,12 @@ export default function GroupsPage() {
       if (!token) return;
 
       try {
-        setGroups(await getNasGroups(token));
+        const [groupItems, permissionItems] = await Promise.all([
+          getNasGroups(token),
+          getEffectivePermissions(token),
+        ]);
+        setGroups(groupItems);
+        setPermissions(permissionItems);
         setError(null);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Errore caricamento gruppi");
@@ -97,6 +117,7 @@ export default function GroupsPage() {
         if (snapshotFilter === "with-snapshot" && group.last_seen_snapshot_id == null) return false;
         if (snapshotFilter === "without-snapshot" && group.last_seen_snapshot_id != null) return false;
         if (scopeFilter === "operational" && isSystemGroup(group)) return false;
+        if (!showSynologyServiceGroups && isSynologyServiceGroup(group)) return false;
 
         if (!normalizedSearch) return true;
 
@@ -105,13 +126,70 @@ export default function GroupsPage() {
         );
       })
       .sort((left, right) => left.name.localeCompare(right.name, "it"));
-  }, [groups, deferredSearchTerm, snapshotFilter, scopeFilter]);
+  }, [groups, deferredSearchTerm, snapshotFilter, scopeFilter, showSynologyServiceGroups]);
 
   const systemGroupCount = useMemo(
     () => groups.filter((group) => isSystemGroup(group)).length,
     [groups],
   );
   const operationalGroupCount = groups.length - systemGroupCount;
+  const permissionStatsByGroup = useMemo(() => {
+    const stats = new Map<
+      string,
+      {
+        readOnlyUsers: number;
+        writeUsers: number;
+        mixedUsers: number;
+      }
+    >();
+
+    for (const group of groups) {
+      const userStates = new Map<number, { hasRead: boolean; hasWrite: boolean }>();
+
+      permissions.forEach((permission) => {
+        if (!permission.source_summary.includes(`group:${group.name}:`)) {
+          return;
+        }
+
+        const current = userStates.get(permission.nas_user_id) ?? { hasRead: false, hasWrite: false };
+        if (permission.can_read) {
+          current.hasRead = true;
+        }
+        if (permission.can_write) {
+          current.hasWrite = true;
+        }
+        userStates.set(permission.nas_user_id, current);
+      });
+
+      let readOnlyUsers = 0;
+      let writeUsers = 0;
+      let mixedUsers = 0;
+
+      userStates.forEach((state) => {
+        if (state.hasRead && state.hasWrite) {
+          mixedUsers += 1;
+          return;
+        }
+
+        if (state.hasWrite) {
+          writeUsers += 1;
+          return;
+        }
+
+        if (state.hasRead) {
+          readOnlyUsers += 1;
+        }
+      });
+
+      stats.set(group.name, {
+        readOnlyUsers,
+        writeUsers,
+        mixedUsers,
+      });
+    }
+
+    return stats;
+  }, [groups, permissions]);
 
   return (
     <ProtectedPage
@@ -168,6 +246,15 @@ export default function GroupsPage() {
               <option value="all">Tutti i gruppi</option>
             </select>
           </label>
+          <label className="flex items-center gap-3 self-end rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
+            <input
+              checked={showSynologyServiceGroups}
+              className="h-4 w-4 rounded border-gray-300 text-[#1D4E35] focus:ring-[#1D4E35]"
+              onChange={(event) => setShowSynologyServiceGroups(event.target.checked)}
+              type="checkbox"
+            />
+            Mostra gruppi Synology
+          </label>
         </TableFilters>
       </article>
 
@@ -191,16 +278,46 @@ export default function GroupsPage() {
                   <div className="mt-2">
                     <Badge
                       className={cn(
-                        isSystemGroup(group) ? "bg-gray-100 text-gray-500" : "bg-[#EAF3E8] text-[#1D4E35]",
+                        isSystemGroup(group) || isSynologyServiceGroup(group)
+                          ? "bg-gray-100 text-gray-500"
+                          : "bg-[#EAF3E8] text-[#1D4E35]",
                       )}
                     >
-                      {isSystemGroup(group) ? "Tecnico / sistema" : "Operativo"}
+                      {isSynologyServiceGroup(group)
+                        ? "Servizio Synology"
+                        : isSystemGroup(group)
+                          ? "Tecnico / sistema"
+                          : "Operativo"}
                     </Badge>
                   </div>
                 </div>
                 <Badge variant={group.last_seen_snapshot_id != null ? "success" : "warning"}>
                   {group.last_seen_snapshot_id != null ? "Presente" : "Da verificare"}
                 </Badge>
+              </div>
+              <div className="mt-4 overflow-hidden rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-[0.08em] text-gray-400">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">Lettura</th>
+                      <th className="px-3 py-2 text-left font-medium">Scrittura</th>
+                      <th className="px-3 py-2 text-left font-medium">Misto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-gray-100 text-gray-700">
+                      <td className="px-3 py-2 font-medium">
+                        {permissionStatsByGroup.get(group.name)?.readOnlyUsers ?? 0}
+                      </td>
+                      <td className="px-3 py-2 font-medium">
+                        {permissionStatsByGroup.get(group.name)?.writeUsers ?? 0}
+                      </td>
+                      <td className="px-3 py-2 font-medium">
+                        {permissionStatsByGroup.get(group.name)?.mixedUsers ?? 0}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <div className="mt-4 border-t border-gray-50 pt-3 text-xs text-gray-400">
                 Ultimo snapshot: {group.last_seen_snapshot_id ?? "—"}

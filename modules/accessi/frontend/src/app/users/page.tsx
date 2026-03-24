@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [groupFilter, setGroupFilter] = useState("all");
+  const [pageSize, setPageSize] = useState<10 | 30 | 100>(30);
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
@@ -156,6 +157,11 @@ export default function UsersPage() {
       );
     });
   }, [rows, deferredSearchTerm, activityFilter, groupFilter]);
+
+  const visibleRows = useMemo(
+    () => filteredRows.slice(0, pageSize),
+    [filteredRows, pageSize],
+  );
 
   const columns = useMemo<ColumnDef<UserRow>[]>(
     () => [
@@ -274,12 +280,26 @@ export default function UsersPage() {
       </article>
 
       <article className="panel-card overflow-hidden p-0">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <p className="section-title">Utenti sincronizzati</p>
-          <p className="section-copy">La riga apre il dettaglio utente in modal con permessi, review e attività.</p>
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
+          <div>
+            <p className="section-title">Utenti sincronizzati</p>
+            <p className="section-copy">La riga apre il dettaglio utente in modal con permessi, review e attività.</p>
+          </div>
+          <label className="text-sm font-medium text-gray-700">
+            Mostra
+            <select
+              className="form-control mt-1 min-w-24"
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value) as 10 | 30 | 100)}
+            >
+              <option value={10}>10</option>
+              <option value={30}>30</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
         </div>
         <DataTable
-          data={filteredRows}
+          data={visibleRows}
           columns={columns}
           emptyTitle="Nessun utente trovato"
           emptyDescription="Nessun utente corrisponde ai filtri selezionati."

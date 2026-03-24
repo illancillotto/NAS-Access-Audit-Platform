@@ -208,6 +208,10 @@ export default function AccessiPage() {
             <MetricCard label="Accessi negati" value={deniedCount} sub="Regole con deny attivo" variant={deniedCount > 0 ? "danger" : "default"} />
           </div>
 
+          <p className="text-sm text-gray-500">
+            Gli snapshot mostrati in GAIA sono snapshot interni della piattaforma, generati durante la sincronizzazione, non snapshot nativi del NAS Synology.
+          </p>
+
           <div className="grid gap-6 xl:grid-cols-2">
             <article className="panel-card">
               <div className="mb-4 flex items-center justify-between gap-3">
