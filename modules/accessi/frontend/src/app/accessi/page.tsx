@@ -8,8 +8,6 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Topbar } from "@/components/layout/topbar";
 import { AlertBanner } from "@/components/ui/alert-banner";
 import { MetricCard } from "@/components/ui/metric-card";
-import { PermissionBadge } from "@/components/ui/permission-badge";
-import { SourceTag } from "@/components/ui/source-tag";
 import { SyncButton } from "@/components/ui/sync-button";
 import { AlertTriangleIcon, ChevronRightIcon, FolderIcon, SearchIcon, UserIcon } from "@/components/ui/icons";
 import {
@@ -20,7 +18,6 @@ import {
   getShares,
 } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
-import { getPermissionLevel } from "@/lib/presentation";
 import type { CurrentUser, DashboardSummary, EffectivePermission, NasUser, Share } from "@/types/api";
 
 const emptySummary: DashboardSummary = {
@@ -102,16 +99,47 @@ export default function AccessiPage() {
     [shares],
   );
 
-  const latestPermissions = useMemo(() => permissions.slice(0, 8), [permissions]);
+  const recentRootSharesWithUsers = useMemo(() => {
+    const shareMap = new Map(shares.map((share) => [share.id, share]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return [...shares]
+      .filter((share) => share.parent_id == null)
+      .sort((left, right) => left.name.localeCompare(right.name, "it"))
+      .slice(0, 6)
+      .map((share) => {
+        const accessibleUsers = Array.from(
+          new Set(
+            permissions
+              .filter((permission) => {
+                const permissionShare = shareMap.get(permission.share_id);
+
+                if (!permissionShare) {
+                  return false;
+                }
+
+                const isOnBranch =
+                  permissionShare.id === share.id ||
+                  permissionShare.path.startsWith(`${share.path}/`);
+
+                if (!isOnBranch) {
+                  return false;
+                }
+
+                return permission.can_read || permission.can_write;
+              })
+              .map((permission) => userMap.get(permission.nas_user_id)?.username)
+              .filter((username): username is string => Boolean(username)),
+          ),
+        ).sort((left, right) => left.localeCompare(right, "it"));
+
+        return {
+          share,
+          accessibleUsers,
+        };
+      });
+  }, [permissions, shares, users]);
   const deniedCount = permissions.filter((item) => item.is_denied).length;
-
-  function getUserLabel(userId: number): string {
-    return users.find((user) => user.id === userId)?.username ?? String(userId);
-  }
-
-  function getShareLabel(shareId: number): string {
-    return shares.find((share) => share.id === shareId)?.name ?? String(shareId);
-  }
 
   if (isCheckingSession || !currentUser) {
     return (
@@ -245,46 +273,57 @@ export default function AccessiPage() {
           <article className="panel-card">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="section-title">Permessi effettivi recenti</p>
-                <p className="section-copy">Estratto dell’ultimo snapshot persistito.</p>
+                <p className="section-title">Cartelle principali e utenti con accesso</p>
+                <p className="section-copy">Share root dell’ultimo snapshot con utenti che possono accedere al ramo.</p>
               </div>
               <Link href="/effective-permissions" className="text-sm font-medium text-[#1D4E35]">
                 Apri vista completa
               </Link>
             </div>
 
-            {latestPermissions.length === 0 ? (
+            {recentRootSharesWithUsers.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
                 <SearchIcon className="mx-auto h-5 w-5 text-gray-300" />
-                <p className="mt-3 text-sm font-medium text-gray-900">Nessun permesso disponibile</p>
+                <p className="mt-3 text-sm font-medium text-gray-900">Nessuna cartella disponibile</p>
                 <p className="mt-1 text-sm text-gray-500">Esegui una sincronizzazione per popolare l’ultimo snapshot.</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-gray-100">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Utente</th>
-                      <th>Cartella</th>
-                      <th>Permesso</th>
-                      <th>Origine</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {latestPermissions.map((permission) => (
-                      <tr key={permission.id}>
-                        <td>{getUserLabel(permission.nas_user_id)}</td>
-                        <td>{getShareLabel(permission.share_id)}</td>
-                        <td>
-                          <PermissionBadge level={getPermissionLevel(permission)} />
-                        </td>
-                        <td>
-                          <SourceTag source={permission.source_summary} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                {recentRootSharesWithUsers.map(({ share, accessibleUsers }) => (
+                  <div key={share.id} className="rounded-xl border border-gray-100 bg-white px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{share.name}</p>
+                        <p className="truncate text-xs text-gray-400">{share.path}</p>
+                      </div>
+                      <Link href={`/shares/${share.id}`} className="text-sm font-medium text-[#1D4E35]">
+                        Apri
+                      </Link>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {accessibleUsers.length > 0 ? (
+                        accessibleUsers.slice(0, 8).map((username) => (
+                          <span
+                            key={`${share.id}-${username}`}
+                            className="inline-flex items-center rounded-full bg-[#EAF3E8] px-2.5 py-1 text-xs font-medium text-[#1D4E35]"
+                          >
+                            {username}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
+                          Nessun accesso rilevato
+                        </span>
+                      )}
+                      {accessibleUsers.length > 8 ? (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
+                          +{accessibleUsers.length - 8} altri
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </article>

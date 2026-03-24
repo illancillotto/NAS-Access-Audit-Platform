@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -63,13 +63,15 @@ def sync_apply(
 def sync_live_apply(
     current_user: Annotated[ApplicationUser, Depends(require_active_user)],
     db: Annotated[Session, Depends(get_db)],
+    profile: Literal["quick", "full"] = "quick",
 ) -> SyncApplyResponse:
     try:
         return run_live_sync_job(
             db,
             trigger_type="api",
             initiated_by=current_user.username,
-            source_label="api:ssh",
+            source_label=f"api:ssh:{profile}",
+            profile=profile,
         ).sync_result
     except NasConnectorError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

@@ -88,4 +88,6 @@ def get_sync_capabilities() -> SyncCapabilitiesResponse:
         retry_max_delay_seconds=settings.sync_live_backoff_max_delay_seconds,
         retry_jitter_enabled=settings.sync_live_backoff_jitter_enabled,
         retry_jitter_ratio=settings.sync_live_backoff_jitter_ratio,
+        live_sync_profiles=["quick", "full"],
+        default_live_sync_profile="quick",
     )

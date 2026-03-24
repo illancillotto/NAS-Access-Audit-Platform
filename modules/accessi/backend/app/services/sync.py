@@ -46,29 +46,28 @@ def build_sync_preview(payload: SyncPreviewRequest) -> SyncPreviewResponse:
     )
 
 
-def build_live_sync_payload(client: NasSSHClient | None = None) -> SyncPreviewRequest:
+def build_live_sync_payload(
+    client: NasSSHClient | None = None,
+    profile: str = "quick",
+) -> SyncPreviewRequest:
     active_client = client or get_nas_client()
     passwd_text = active_client.run_command(settings.nas_passwd_command)
     group_text = active_client.run_command(settings.nas_group_command)
     root_shares_text = active_client.run_command(settings.nas_shares_command)
     parsed_shares = parse_share_listing(root_shares_text)
+    subpaths_command = _get_subpaths_command(profile)
 
-    if settings.nas_share_subpaths_command.strip():
+    if subpaths_command.strip():
         try:
             parsed_shares = _merge_shares(
                 parsed_shares,
-                _collect_subpath_shares(active_client, parsed_shares),
+                _collect_subpath_shares(active_client, parsed_shares, subpaths_command),
             )
         except Exception:
             logger.warning("Unable to enumerate NAS subpaths, continuing with root shares only", exc_info=True)
 
+    parsed_shares, acl_texts = _collect_share_acls(active_client, parsed_shares)
     shares_text = _serialize_share_listing(parsed_shares)
-    acl_texts = [
-        active_client.run_command(
-            settings.nas_acl_command_template.format(share=shlex.quote(share.name))
-        )
-        for share in parsed_shares
-    ]
     return SyncPreviewRequest(
         passwd_text=passwd_text,
         group_text=group_text,
@@ -113,11 +112,12 @@ def _serialize_share_listing(shares: list[ParsedShare]) -> str:
 def _collect_subpath_shares(
     client: NasSSHClient,
     root_shares: list[ParsedShare],
+    command_template: str,
 ) -> list[ParsedShare]:
     subpath_shares: list[ParsedShare] = []
 
     for share in root_shares:
-        command = settings.nas_share_subpaths_command.format(share=shlex.quote(share.name))
+        command = command_template.format(share=shlex.quote(share.name))
         try:
             subpath_output = client.run_command(command)
         except Exception:
@@ -127,6 +127,35 @@ def _collect_subpath_shares(
         subpath_shares = _merge_shares(subpath_shares, parse_share_listing(subpath_output))
 
     return subpath_shares
+
+
+def _collect_share_acls(
+    client: NasSSHClient,
+    shares: list[ParsedShare],
+) -> tuple[list[ParsedShare], list[str]]:
+    successful_shares: list[ParsedShare] = []
+    acl_texts: list[str] = []
+
+    for share in shares:
+        command = settings.nas_acl_command_template.format(share=shlex.quote(share.name))
+
+        try:
+            acl_output = client.run_command(command)
+        except Exception:
+            logger.warning("Unable to fetch ACL for %s", share.name, exc_info=True)
+            continue
+
+        successful_shares.append(share)
+        acl_texts.append(acl_output)
+
+    return successful_shares, acl_texts
+
+
+def _get_subpaths_command(profile: str) -> str:
+    if profile == "full":
+        return settings.nas_share_subpaths_full_command
+
+    return settings.nas_share_subpaths_command
 
 
 def _normalize_subject(raw_subject: str) -> tuple[str, str] | None:
@@ -386,5 +415,9 @@ def apply_sync_payload(db: Session, payload: SyncPreviewRequest) -> SyncApplyRes
     )
 
 
-def apply_live_sync(db: Session, client: NasSSHClient | None = None) -> SyncApplyResponse:
-    return apply_sync_payload(db, build_live_sync_payload(client))
+def apply_live_sync(
+    db: Session,
+    client: NasSSHClient | None = None,
+    profile: str = "quick",
+) -> SyncApplyResponse:
+    return apply_sync_payload(db, build_live_sync_payload(client, profile=profile))

@@ -8,6 +8,7 @@ from app.models.application_user import ApplicationUser, ApplicationUserRole
 from app.models.snapshot import Snapshot
 from app.models.sync_run import SyncRun
 from app.schemas.sync import SyncPreviewRequest
+from app.services.nas_connector import NasConnectorError
 from app.services.sync import apply_live_sync, build_live_sync_payload
 
 
@@ -27,8 +28,8 @@ class FakeNasClient:
                 "direzione:x:2002:lbianchi\n"
             ),
             "ls /volume1": "contabilita\ndirezione\n",
-            "find /volume1/contabilita -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true": "/volume1/contabilita/reporting\n",
-            "find /volume1/direzione -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true": "",
+            "find /volume1/contabilita \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true": "/volume1/contabilita/reporting\n",
+            "find /volume1/direzione \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true": "",
             "synoacltool -get /volume1/contabilita": (
                 "allow: group:amministrazione:read,write\n"
                 "deny: user:ospite:read\n"
@@ -45,7 +46,7 @@ def test_build_live_sync_payload_fetches_base_and_acl_commands(monkeypatch) -> N
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_share_subpaths_command",
-        "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true",
+        "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true",
     )
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
@@ -66,8 +67,8 @@ def test_build_live_sync_payload_fetches_base_and_acl_commands(monkeypatch) -> N
         "getent passwd",
         "getent group",
         "ls /volume1",
-        "find /volume1/contabilita -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true",
-        "find /volume1/direzione -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true",
+        "find /volume1/contabilita \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true",
+        "find /volume1/direzione \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true",
         "synoacltool -get /volume1/contabilita",
         "synoacltool -get /volume1/direzione",
         "synoacltool -get /volume1/contabilita/reporting",
@@ -80,7 +81,7 @@ def test_apply_live_sync_persists_snapshot_from_live_payload(monkeypatch) -> Non
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_share_subpaths_command",
-        "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true",
+        "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true",
     )
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
@@ -118,3 +119,31 @@ def test_apply_live_sync_persists_snapshot_from_live_payload(monkeypatch) -> Non
         assert db.query(SyncRun).count() == 0
     finally:
         db.close()
+
+
+def test_build_live_sync_payload_skips_shares_with_unreadable_acl(monkeypatch) -> None:
+    class PartialAclClient(FakeNasClient):
+        def run_command(self, command: str) -> str:
+            if command == "synoacltool -get /volume1/contabilita/reporting":
+                raise NasConnectorError("acl denied")
+            return super().run_command(command)
+
+    monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
+    monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
+    monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
+    monkeypatch.setattr(
+        "app.services.sync.settings.nas_share_subpaths_command",
+        "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true",
+    )
+    monkeypatch.setattr(
+        "app.services.sync.settings.nas_acl_command_template",
+        "synoacltool -get /volume1/{share}",
+    )
+
+    payload = build_live_sync_payload(PartialAclClient())
+
+    assert payload.shares_text == "contabilita\ndirezione\n"
+    assert payload.acl_texts == [
+        "allow: group:amministrazione:read,write\ndeny: user:ospite:read\n",
+        "allow: group:direzione:write\n",
+    ]

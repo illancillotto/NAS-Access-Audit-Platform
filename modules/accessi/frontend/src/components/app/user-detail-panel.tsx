@@ -15,6 +15,7 @@ import { getEffectivePermissions, getReviews } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
   buildPermissionTree,
+  filterPermissionTreeForDisplay,
   getAnomalousPermissions,
   isEscalation,
   isMultiSourceAnomaly,
@@ -76,7 +77,7 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
   );
   const hasAnomalies = anomalousPermissions.length > 0;
   const permissionTree = useMemo(
-    () => buildPermissionTree(userPermissions, shares),
+    () => filterPermissionTreeForDisplay(buildPermissionTree(userPermissions, shares)),
     [shares, userPermissions],
   );
 

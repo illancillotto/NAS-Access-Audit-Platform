@@ -140,8 +140,11 @@ export async function applySync(
   });
 }
 
-export async function applyLiveSync(token: string): Promise<SyncLiveApplyResult> {
-  return request<SyncLiveApplyResult>("/sync/live-apply", {
+export async function applyLiveSync(
+  token: string,
+  profile: "quick" | "full" = "quick",
+): Promise<SyncLiveApplyResult> {
+  return request<SyncLiveApplyResult>(`/sync/live-apply?profile=${profile}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

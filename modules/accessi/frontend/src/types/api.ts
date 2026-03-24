@@ -71,6 +71,8 @@ export type SyncCapabilities = {
   retry_max_delay_seconds: number;
   retry_jitter_enabled: boolean;
   retry_jitter_ratio: number;
+  live_sync_profiles: string[];
+  default_live_sync_profile: string;
 };
 
 export type SyncPreviewRequest = {

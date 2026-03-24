@@ -198,6 +198,46 @@ export function buildPermissionTree(
     .sort((left, right) => left.share.path.localeCompare(right.share.path, "it"));
 }
 
+function hasEffectiveAccess(permission: EffectivePermission): boolean {
+  return permission.can_read || permission.can_write || permission.is_denied;
+}
+
+export function filterPermissionTreeForDisplay(
+  nodes: PermissionTreeNode[],
+): PermissionTreeNode[] {
+  const childrenByParentId = new Map<number, PermissionTreeNode[]>();
+
+  for (const node of nodes) {
+    const parentId = node.share.parent_id;
+
+    if (!parentId) {
+      continue;
+    }
+
+    const siblings = childrenByParentId.get(parentId) ?? [];
+    siblings.push(node);
+    childrenByParentId.set(parentId, siblings);
+  }
+
+  const visibleShareIds = new Set<number>();
+
+  function markVisible(node: PermissionTreeNode): boolean {
+    const children = childrenByParentId.get(node.share.id) ?? [];
+    const descendantVisible = children.some(markVisible);
+    const visible = node.depth === 0 || hasEffectiveAccess(node.permission) || descendantVisible;
+
+    if (visible) {
+      visibleShareIds.add(node.share.id);
+    }
+
+    return visible;
+  }
+
+  nodes.filter((node) => node.depth === 0).forEach(markVisible);
+
+  return nodes.filter((node) => visibleShareIds.has(node.share.id));
+}
+
 export function isEscalation(node: PermissionTreeNode): boolean {
   const { permission, parentPermission } = node;
 

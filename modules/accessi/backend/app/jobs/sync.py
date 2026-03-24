@@ -45,7 +45,8 @@ def run_scheduled_live_sync_cycle(
         client=client,
         trigger_type="scheduled",
         initiated_by="system",
-        source_label="scheduler:ssh",
+        source_label="scheduler:ssh:quick",
+        profile="quick",
         sleep_fn=sleep_fn,
     )
 
@@ -56,6 +57,7 @@ def run_live_sync_job(
     trigger_type: str = "job",
     initiated_by: str | None = None,
     source_label: str | None = None,
+    profile: str = "quick",
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> LiveSyncJobResult:
     last_error: NasConnectorError | None = None
@@ -64,7 +66,7 @@ def run_live_sync_job(
 
     for attempt in range(1, settings.sync_live_max_attempts + 1):
         try:
-            sync_result = apply_live_sync(db, client)
+            sync_result = apply_live_sync(db, client, profile=profile)
             create_sync_run(
                 db,
                 mode="live",
@@ -74,7 +76,7 @@ def run_live_sync_job(
                 snapshot_id=sync_result.snapshot_id,
                 duration_ms=int((time.monotonic() - started_at) * 1000),
                 initiated_by=initiated_by,
-                source_label=source_label or "ssh",
+                source_label=source_label or f"ssh:{profile}",
                 started_at=started_wall_clock,
                 completed_at=datetime.now(timezone.utc),
             )
@@ -94,7 +96,7 @@ def run_live_sync_job(
         attempts_used=settings.sync_live_max_attempts,
         duration_ms=int((time.monotonic() - started_at) * 1000),
         initiated_by=initiated_by,
-        source_label=source_label or "ssh",
+        source_label=source_label or f"ssh:{profile}",
         error_detail=str(last_error),
         started_at=started_wall_clock,
         completed_at=datetime.now(timezone.utc),

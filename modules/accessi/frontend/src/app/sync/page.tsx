@@ -31,7 +31,7 @@ export default function SyncPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<SyncApplyResult | null>(null);
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeProfile, setActiveProfile] = useState<"quick" | "full" | null>(null);
 
   useEffect(() => {
     void loadSyncContext();
@@ -54,23 +54,27 @@ export default function SyncPage() {
     }
   }
 
-  async function handleSync(): Promise<void> {
+  async function handleSync(profile: "quick" | "full"): Promise<void> {
     const token = getStoredAccessToken();
     if (!token) return;
 
-    setIsSubmitting(true);
+    setActiveProfile(profile);
     try {
-      const result = await applyLiveSync(token);
+      const result = await applyLiveSync(token, profile);
       const syncRunsResult = await getSyncRuns(token);
       setApplyResult(result);
       setSyncRuns(syncRunsResult);
-      setStatusMessage("Sincronizzazione completata leggendo dati reali dal NAS.");
+      setStatusMessage(
+        profile === "full"
+          ? "Sincronizzazione completa terminata con scansione estesa dell'albero NAS."
+          : "Sincronizzazione rapida completata leggendo dati reali dal NAS.",
+      );
       setError(null);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Errore sync NAS");
       setStatusMessage(null);
     } finally {
-      setIsSubmitting(false);
+      setActiveProfile(null);
     }
   }
 
@@ -79,7 +83,24 @@ export default function SyncPage() {
       title="Sincronizzazione"
       description="Controllo operativo del connector Synology, esecuzione manuale e storico delle run."
       breadcrumb="Panoramica"
-      topbarActions={<SyncButton loading={isSubmitting} onClick={() => void handleSync()} />}
+      topbarActions={
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-secondary"
+            disabled={activeProfile != null}
+            onClick={() => void handleSync("full")}
+            type="button"
+          >
+            {activeProfile === "full" ? "Full scan..." : "Full scan"}
+          </button>
+          <SyncButton
+            loading={activeProfile === "quick"}
+            disabled={activeProfile != null && activeProfile !== "quick"}
+            label="Sync rapida"
+            onClick={() => void handleSync("quick")}
+          />
+        </div>
+      }
     >
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
@@ -116,7 +137,9 @@ export default function SyncPage() {
               <p className="mt-2 text-sm font-medium text-gray-900">
                 {capabilities.supports_live_sync ? "Disponibile" : "Non disponibile"}
               </p>
-              <p className="mt-1 text-xs text-gray-400">Timeout {capabilities.timeout_seconds}s</p>
+              <p className="mt-1 text-xs text-gray-400">
+                Profili {capabilities.live_sync_profiles.join(" / ")} · Timeout {capabilities.timeout_seconds}s
+              </p>
             </div>
             <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
               <p className="label-caption">Backoff</p>

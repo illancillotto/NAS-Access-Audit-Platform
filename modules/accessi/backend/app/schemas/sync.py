@@ -15,6 +15,8 @@ class SyncCapabilitiesResponse(BaseModel):
     retry_max_delay_seconds: int
     retry_jitter_enabled: bool
     retry_jitter_ratio: float
+    live_sync_profiles: list[str]
+    default_live_sync_profile: str
 
 
 class SyncPreviewRequest(BaseModel):

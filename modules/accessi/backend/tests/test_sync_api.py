@@ -236,7 +236,7 @@ def test_sync_live_apply_uses_connector_payload(monkeypatch) -> None:
 
     monkeypatch.setattr(
         "app.api.routes.sync.run_live_sync_job",
-        lambda db, trigger_type='api', initiated_by=None, source_label=None: FakeJobResult(),
+        lambda db, trigger_type='api', initiated_by=None, source_label=None, profile="quick": FakeJobResult(),
     )
 
     response = client.post("/sync/live-apply", headers=auth_headers())
@@ -280,7 +280,7 @@ def test_build_live_sync_payload_quotes_share_names(monkeypatch) -> None:
 
 
 def test_sync_live_apply_returns_503_when_connector_fails(monkeypatch) -> None:
-    def fake_run_live_sync_job(db, trigger_type="api", initiated_by=None, source_label=None):
+    def fake_run_live_sync_job(db, trigger_type="api", initiated_by=None, source_label=None, profile="quick"):
         raise NasConnectorError("SSH command failed: getent passwd")
 
     monkeypatch.setattr("app.api.routes.sync.run_live_sync_job", fake_run_live_sync_job)

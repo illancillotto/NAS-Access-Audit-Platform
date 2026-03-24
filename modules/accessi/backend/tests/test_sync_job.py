@@ -25,7 +25,7 @@ class FlakyNasClient:
             "getent passwd": "mrossi:x:1001:100:Mario Rossi:/var/services/homes/mrossi:/sbin/nologin\n",
             "getent group": "amministrazione:x:2001:mrossi\n",
             "ls /volume1": "contabilita\n",
-            "find /volume1/contabilita -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true": "",
+            "find /volume1/contabilita \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true": "",
             "synoacltool -get /volume1/contabilita": "allow: group:amministrazione:read,write\n",
         }
         return mapping[command]
@@ -89,7 +89,7 @@ def test_run_live_sync_job_retries_and_then_succeeds(monkeypatch) -> None:
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
-    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true")
+    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
         "synoacltool -get /volume1/{share}",
@@ -145,7 +145,7 @@ def test_run_live_sync_job_raises_after_max_attempts(monkeypatch) -> None:
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
-    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true")
+    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
         "synoacltool -get /volume1/{share}",
@@ -199,7 +199,7 @@ def test_run_scheduled_live_sync_cycle_sets_scheduler_metadata(monkeypatch) -> N
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
-    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true")
+    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
         "synoacltool -get /volume1/{share}",
@@ -234,7 +234,7 @@ def test_run_scheduled_live_sync_cycle_sets_scheduler_metadata(monkeypatch) -> N
     assert result.attempts_used == 1
     assert sync_run.trigger_type == "scheduled"
     assert sync_run.initiated_by == "system"
-    assert sync_run.source_label == "scheduler:ssh"
+    assert sync_run.source_label == "scheduler:ssh:quick"
     assert sync_run.started_at <= sync_run.completed_at
 
 
@@ -248,7 +248,7 @@ def test_run_live_sync_job_uses_exponential_backoff_between_failures(monkeypatch
     monkeypatch.setattr("app.services.sync.settings.nas_passwd_command", "getent passwd")
     monkeypatch.setattr("app.services.sync.settings.nas_group_command", "getent group")
     monkeypatch.setattr("app.services.sync.settings.nas_shares_command", "ls /volume1")
-    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} -mindepth 1 -maxdepth 2 -type d 2>/dev/null || true")
+    monkeypatch.setattr("app.services.sync.settings.nas_share_subpaths_command", "find /volume1/{share} \\( -name '@*' -o -name '#recycle' \\) -prune -o -mindepth 1 -type d -print 2>/dev/null || true")
     monkeypatch.setattr(
         "app.services.sync.settings.nas_acl_command_template",
         "synoacltool -get /volume1/{share}",
