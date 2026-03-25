@@ -9,6 +9,10 @@ export type CurrentUser = {
   email: string;
   role: string;
   is_active: boolean;
+  module_accessi: boolean;
+  module_rete: boolean;
+  module_inventario: boolean;
+  enabled_modules: string[];
 };
 
 export type DashboardSummary = {

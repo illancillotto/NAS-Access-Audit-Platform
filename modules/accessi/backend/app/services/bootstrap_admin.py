@@ -11,8 +11,11 @@ def ensure_bootstrap_admin(db: Session) -> tuple[ApplicationUser, bool]:
     if existing_user is not None:
         existing_user.email = settings.bootstrap_admin_email
         existing_user.password_hash = hash_password(settings.bootstrap_admin_password)
-        existing_user.role = ApplicationUserRole.ADMIN.value
+        existing_user.role = ApplicationUserRole.SUPER_ADMIN.value
         existing_user.is_active = True
+        existing_user.module_accessi = True
+        existing_user.module_rete = True
+        existing_user.module_inventario = True
         db.add(existing_user)
         db.commit()
         db.refresh(existing_user)
@@ -22,8 +25,11 @@ def ensure_bootstrap_admin(db: Session) -> tuple[ApplicationUser, bool]:
         username=settings.bootstrap_admin_username,
         email=settings.bootstrap_admin_email,
         password_hash=hash_password(settings.bootstrap_admin_password),
-        role=ApplicationUserRole.ADMIN.value,
+        role=ApplicationUserRole.SUPER_ADMIN.value,
         is_active=True,
+        module_accessi=True,
+        module_rete=True,
+        module_inventario=True,
     )
     db.add(user)
     db.commit()

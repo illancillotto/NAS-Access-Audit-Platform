@@ -119,3 +119,5 @@ Avanzamento attuale:
 - test verdi locali o in CI
 - documentazione aggiornata
 - progress tracker aggiornato con esito reale
+
+- [x] Milestone 8 (permessi granulari): backend core completato (migrations, modelli, resolver, route principali, bootstrap script).

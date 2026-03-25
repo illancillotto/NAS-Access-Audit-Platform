@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_active_user
+from app.api.deps import require_active_user, require_section
 from app.core.database import get_db
 from app.models.application_user import ApplicationUser
 from app.jobs.sync import run_live_sync_job
@@ -61,7 +61,7 @@ def sync_apply(
 
 @router.post("/live-apply", response_model=SyncApplyResponse)
 def sync_live_apply(
-    current_user: Annotated[ApplicationUser, Depends(require_active_user)],
+    current_user: Annotated[ApplicationUser, Depends(require_section("accessi.sync"))],
     db: Annotated[Session, Depends(get_db)],
     profile: Literal["quick", "full"] = "quick",
 ) -> SyncApplyResponse:
