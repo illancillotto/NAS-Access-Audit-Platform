@@ -49,10 +49,12 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(computed_hash, expected_hash)
 
 
-def create_access_token(subject: str, expires_minutes: int | None = None) -> str:
+def create_access_token(user_id: str, role: str, modules: list[str], expires_minutes: int | None = None) -> str:
     expire_delta = timedelta(minutes=expires_minutes or settings.jwt_expire_minutes)
     payload = {
-        "sub": subject,
+        "sub": user_id,
+        "role": role,
+        "modules": modules,
         "exp": datetime.now(UTC) + expire_delta,
         "type": "access",
     }

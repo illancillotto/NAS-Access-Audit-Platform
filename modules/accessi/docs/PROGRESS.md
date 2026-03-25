@@ -205,3 +205,5 @@ Aggiornare questo file a ogni milestone o a ogni modifica che cambia uno di ques
 - test disponibili o risultati attesi
 - rischi tecnici principali
 - priorita operative successive
+
+- 2026-03-24: Milestone 8 avviata: introdotto sistema moduli/ruoli/sezioni con resolver permessi e API admin utenti.

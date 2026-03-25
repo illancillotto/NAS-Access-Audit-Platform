@@ -5,8 +5,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.application_user import ApplicationUser, ApplicationUserRole
+from app.models.application_user import ApplicationUser
 from app.services.auth import get_current_user_from_token
+from app.services.permission_resolver import can_access_section
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -29,12 +30,34 @@ def require_active_user(
     return current_user
 
 
+def require_role(*roles: str):
+    def _require_role(
+        current_user: Annotated[ApplicationUser, Depends(require_active_user)],
+    ) -> ApplicationUser:
+        if current_user.role not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
+        return current_user
+
+    return _require_role
+
+
+def require_section(section_key: str):
+    def _require_section(
+        db: Annotated[Session, Depends(get_db)],
+        current_user: Annotated[ApplicationUser, Depends(require_active_user)],
+    ) -> ApplicationUser:
+        if not can_access_section(db, current_user, section_key):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Section access denied")
+        return current_user
+
+    return _require_section
+
+
+RequireAdmin = Depends(require_role("super_admin", "admin"))
+RequireSuperAdmin = Depends(require_role("super_admin"))
+
+
 def require_admin_user(
-    current_user: Annotated[ApplicationUser, Depends(require_active_user)],
+    current_user: Annotated[ApplicationUser, Depends(require_role("super_admin", "admin"))],
 ) -> ApplicationUser:
-    if current_user.role != ApplicationUserRole.ADMIN.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
     return current_user

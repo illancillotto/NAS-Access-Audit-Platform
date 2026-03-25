@@ -19,3 +19,7 @@ class CurrentUserResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    module_accessi: bool
+    module_rete: bool
+    module_inventario: bool
+    enabled_modules: list[str]
