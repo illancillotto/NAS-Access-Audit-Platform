@@ -27,7 +27,7 @@ def authenticate_user(db: Session, username: str, password: str) -> ApplicationU
 
 
 def issue_access_token(user: ApplicationUser) -> str:
-    return create_access_token(str(user.id))
+    return create_access_token(str(user.id), user.role, user.enabled_modules)
 
 
 def get_current_user_from_token(db: Session, token: str) -> ApplicationUser:

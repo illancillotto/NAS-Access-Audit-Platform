@@ -96,13 +96,16 @@ def test_me_returns_current_user() -> None:
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert response.json() == {
-        "id": 1,
-        "username": "admin",
-        "email": "admin@example.local",
-        "role": "admin",
-        "is_active": True,
-    }
+    body = response.json()
+    assert body["id"] == 1
+    assert body["username"] == "admin"
+    assert body["email"] == "admin@example.local"
+    assert body["role"] == "admin"
+    assert body["is_active"] is True
+    assert body["module_accessi"] is True
+    assert body["module_rete"] is False
+    assert body["module_inventario"] is False
+    assert body["enabled_modules"] == ["accessi"]
 
 
 def test_me_requires_authentication() -> None:
