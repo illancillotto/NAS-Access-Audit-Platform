@@ -239,8 +239,40 @@ class CatastoWorker:
                 if self.state.stop_requested:
                     return
                 await asyncio.sleep(BETWEEN_VISURE_DELAY_SEC)
+        except Exception as exc:
+            logger.exception("Batch %s failed before completion", batch_id)
+            self._fail_batch(batch_id, str(exc))
         finally:
             await browser.stop()
+
+    def _fail_batch(self, batch_id, message: str) -> None:
+        with SessionLocal() as db:
+            batch = db.get(CatastoBatch, batch_id)
+            if batch is None:
+                return
+
+            requests = db.scalars(
+                select(CatastoVisuraRequest).where(CatastoVisuraRequest.batch_id == batch_id),
+            ).all()
+
+            for request in requests:
+                if request.status in {
+                    CatastoVisuraRequestStatus.PENDING.value,
+                    CatastoVisuraRequestStatus.PROCESSING.value,
+                    CatastoVisuraRequestStatus.AWAITING_CAPTCHA.value,
+                }:
+                    request.status = CatastoVisuraRequestStatus.FAILED.value
+                    request.current_operation = "Failed before visura execution"
+                    request.error_message = message
+                    request.processed_at = datetime.now(timezone.utc)
+                    request.captcha_manual_solution = None
+                    request.captcha_skip_requested = False
+
+            batch.status = CatastoBatchStatus.FAILED.value
+            batch.current_operation = message
+            batch.completed_at = datetime.now(timezone.utc)
+            self._refresh_batch_counts(db, batch)
+            db.commit()
 
     def _next_request_id(self, batch_id):
         with SessionLocal() as db:

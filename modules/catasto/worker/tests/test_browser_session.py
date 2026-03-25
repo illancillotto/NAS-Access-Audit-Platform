@@ -17,7 +17,10 @@ def test_browser_session_classifies_locked_user_page() -> None:
         "Utente bloccato sul portale SISTER",
     )
 
-    assert message == "Utente SISTER bloccato sul portale Agenzia delle Entrate."
+    assert message == (
+        "Utente SISTER bloccato sul portale Agenzia delle Entrate. "
+        "Verificare se esiste gia' una sessione attiva su un'altra postazione o browser."
+    )
 
 
 def test_browser_session_classifies_existing_session_page() -> None:

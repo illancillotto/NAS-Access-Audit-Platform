@@ -253,7 +253,10 @@ class BrowserSession:
         if "gia' in sessione" in haystack or "già in sessione" in haystack or "altra postazione" in haystack:
             return "Utente SISTER gia' in sessione su un'altra postazione o browser."
         if "error_locked.jsp" in haystack or "utente bloccato" in haystack:
-            return "Utente SISTER bloccato sul portale Agenzia delle Entrate."
+            return (
+                "Utente SISTER bloccato sul portale Agenzia delle Entrate. "
+                "Verificare se esiste gia' una sessione attiva su un'altra postazione o browser."
+            )
         if "credenzial" in haystack and (
             "errat" in haystack or "non valide" in haystack or "non sono valide" in haystack
         ):
