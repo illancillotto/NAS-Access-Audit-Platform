@@ -11,6 +11,8 @@ from playwright.async_api import Browser, BrowserContext, Download, Page, Playwr
 from sister_selectors import SisterSelectorsConfig
 
 logger = logging.getLogger(__name__)
+MENU_NAVIGATION_RETRIES = 3
+MENU_NAVIGATION_RETRY_DELAY_SEC = 2
 
 
 @dataclass(slots=True)
@@ -46,12 +48,15 @@ class BrowserSession:
         return self._page
 
     async def start(self) -> None:
+        logger.info("Starting Playwright browser session")
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(headless=self.config.headless)
         self._context = await self._browser.new_context(accept_downloads=True)
         self._page = await self._context.new_page()
+        logger.info("Playwright browser session ready")
 
     async def stop(self) -> None:
+        logger.info("Stopping Playwright browser session")
         if self._context is not None:
             await self._context.close()
         if self._browser is not None:
@@ -65,6 +70,7 @@ class BrowserSession:
             and self._authenticated_until is not None
             and datetime.now(timezone.utc) < self._authenticated_until
         ):
+            logger.info("Reusing existing SISTER session for %s", username)
             return
 
         await self.login(username, password)
@@ -113,37 +119,55 @@ class BrowserSession:
     async def login(self, username: str, password: str) -> None:
         page = self.page
         try:
+            logger.info("Starting SISTER login for %s", username)
             await page.goto(self.selectors.login_url, wait_until="domcontentloaded")
             await page.click(self.selectors.login_tab_selector)
             await page.fill(self.selectors.username_selector, username)
             await page.fill(self.selectors.password_selector, password)
             await page.click(self.selectors.login_button_selector)
             await self._maybe_click_xpath(self.selectors.confirm_button_xpath)
-            await self._goto_visura_menu()
+            await self._goto_visura_menu_with_retry()
         except TimeoutError as exc:
             url, title, body_excerpt = await self._read_page_state()
             issue_message = self._classify_login_issue(url, title, body_excerpt)
+            debug_context = await self._collect_debug_context("login-timeout", url, title, body_excerpt)
             if issue_message:
-                raise RuntimeError(issue_message) from exc
-            raise
+                raise RuntimeError(f"{issue_message} {debug_context}") from exc
+            raise RuntimeError(f"Login timeout. {debug_context}") from exc
+        except Exception as exc:
+            url, title, body_excerpt = await self._read_page_state()
+            debug_context = await self._collect_debug_context("login-error", url, title, body_excerpt)
+            raise RuntimeError(f"SISTER login failed: {exc}. {debug_context}") from exc
 
         self._username = username
         self._authenticated_until = datetime.now(timezone.utc) + timedelta(seconds=self.config.session_timeout_sec)
+        logger.info("SISTER login completed for %s", username)
 
         if self.config.debug_pause:
             await page.pause()
 
     async def open_visura_form(self) -> None:
         page = self.page
-        await self._goto_visura_menu()
+        logger.info("Opening SISTER visura form")
+        await self._goto_visura_menu_with_retry()
         if await page.locator(self.selectors.territorio_selector).count() > 0:
             await page.select_option(self.selectors.territorio_selector, value=self.selectors.territorio_value)
             await page.get_by_role("button", name=self.selectors.territorio_apply_button_name).click()
         await page.get_by_role("link", name=self.selectors.immobile_link_name).click()
         await page.wait_for_selector(self.selectors.catasto_selector)
+        logger.info("SISTER visura form ready")
 
     async def fill_visura_form(self, request) -> None:
         page = self.page
+        logger.info(
+            "Filling visura form for request %s comune=%s foglio=%s particella=%s subalterno=%s tipo=%s",
+            request.id,
+            request.comune,
+            request.foglio,
+            request.particella,
+            request.subalterno,
+            request.tipo_visura,
+        )
         await page.select_option(self.selectors.catasto_selector, label=request.catasto)
         await page.select_option(self.selectors.comune_selector, value=request.comune_codice)
 
@@ -161,6 +185,7 @@ class BrowserSession:
         await page.click(self.selectors.visura_button_selector)
         await page.wait_for_selector(self.selectors.tipo_visura_selector)
         await page.check(f"{self.selectors.tipo_visura_selector}[value='{self.tipo_visura_value(request.tipo_visura)}']")
+        logger.info("Visura form submitted for request %s", request.id)
 
     async def capture_captcha_image(self) -> bytes:
         await self.page.wait_for_selector(self.selectors.captcha_image_selector)
@@ -168,29 +193,65 @@ class BrowserSession:
 
     async def submit_captcha(self, text: str) -> bool:
         page = self.page
+        logger.info("Submitting CAPTCHA candidate with %s chars", len(text))
         await page.fill(self.selectors.captcha_field_selector, text)
         await page.click(self.selectors.inoltra_button_selector)
 
         try:
             await page.wait_for_selector(self.selectors.save_button_selector, timeout=12000)
+            logger.info("CAPTCHA accepted by SISTER")
             return True
         except TimeoutError:
-            return await page.locator(self.selectors.save_button_selector).count() > 0
+            accepted = await page.locator(self.selectors.save_button_selector).count() > 0
+            logger.info("CAPTCHA accepted after timeout fallback=%s", accepted)
+            return accepted
 
     async def download_pdf(self, destination: Path) -> int:
         page = self.page
         destination.parent.mkdir(parents=True, exist_ok=True)
+        logger.info("Starting PDF download to %s", destination)
         async with page.expect_download(timeout=20000) as download_info:
             await page.click(self.selectors.save_button_selector)
         download: Download = await download_info.value
         await download.save_as(str(destination))
+        logger.info("PDF download completed: %s", destination)
         return destination.stat().st_size
 
     async def _goto_visura_menu(self) -> None:
         page = self.page
+        logger.info("Navigating to SISTER visura menu")
         await page.get_by_role("link", name=self.selectors.consultazioni_link_name).click()
         await page.get_by_role("link", name=self.selectors.visure_link_name).click()
         await self._maybe_click_text(self.selectors.conferma_lettura_button_name)
+
+    async def _goto_visura_menu_with_retry(self) -> None:
+        last_error: TimeoutError | None = None
+        for attempt in range(1, MENU_NAVIGATION_RETRIES + 1):
+            try:
+                logger.info("Opening visura menu attempt %s/%s", attempt, MENU_NAVIGATION_RETRIES)
+                await self._goto_visura_menu()
+                return
+            except TimeoutError as exc:
+                last_error = exc
+                url, title, body_excerpt = await self._read_page_state()
+                debug_context = await self._collect_debug_context(
+                    f"visura-menu-timeout-attempt-{attempt}",
+                    url,
+                    title,
+                    body_excerpt,
+                )
+                logger.warning(
+                    "Timeout while opening visura menu attempt %s/%s: %s",
+                    attempt,
+                    MENU_NAVIGATION_RETRIES,
+                    debug_context,
+                )
+                if attempt >= MENU_NAVIGATION_RETRIES:
+                    raise
+                await asyncio.sleep(MENU_NAVIGATION_RETRY_DELAY_SEC)
+
+        if last_error is not None:
+            raise last_error
 
     async def _maybe_click_xpath(self, xpath: str) -> None:
         locator = self.page.locator(f"xpath={xpath}")

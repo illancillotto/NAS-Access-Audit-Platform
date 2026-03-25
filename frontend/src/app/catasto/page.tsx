@@ -1,45 +1,89 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { CatastoOperationMessage } from "@/components/catasto/operation-message";
 import { MetricCard } from "@/components/ui/metric-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DocumentIcon, FolderIcon, LockIcon, SearchIcon } from "@/components/ui/icons";
-import { getCatastoBatches, getCatastoCredentials, getPendingCatastoCaptcha } from "@/lib/api";
+import { getCatastoBatches, getCatastoCredentials, getPendingCatastoCaptcha, retryFailedCatastoBatch, startCatastoBatch } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { formatDateTime } from "@/lib/presentation";
 import type { CatastoBatch, CatastoCredentialStatus, CatastoVisuraRequest } from "@/types/api";
+
+const DASHBOARD_REFRESH_INTERVAL_MS = 5000;
 
 export default function CatastoDashboardPage() {
   const [batches, setBatches] = useState<CatastoBatch[]>([]);
   const [credentialStatus, setCredentialStatus] = useState<CatastoCredentialStatus | null>(null);
   const [pendingCaptcha, setPendingCaptcha] = useState<CatastoVisuraRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [retryBusyId, setRetryBusyId] = useState<string | null>(null);
+
+  const loadCatastoDashboard = useCallback(async (): Promise<void> => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+
+    try {
+      const [credentialsResult, batchesResult, captchaResult] = await Promise.all([
+        getCatastoCredentials(token),
+        getCatastoBatches(token),
+        getPendingCatastoCaptcha(token),
+      ]);
+      setCredentialStatus(credentialsResult);
+      setBatches(batchesResult.slice(0, 6));
+      setPendingCaptcha(captchaResult);
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Errore caricamento dashboard Catasto");
+    }
+  }, []);
 
   useEffect(() => {
-    async function loadCatastoDashboard() {
-      const token = getStoredAccessToken();
-      if (!token) return;
+    void loadCatastoDashboard();
+  }, [loadCatastoDashboard]);
 
-      try {
-        const [credentialsResult, batchesResult, captchaResult] = await Promise.all([
-          getCatastoCredentials(token),
-          getCatastoBatches(token),
-          getPendingCatastoCaptcha(token),
-        ]);
-        setCredentialStatus(credentialsResult);
-        setBatches(batchesResult.slice(0, 6));
-        setPendingCaptcha(captchaResult);
-        setError(null);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Errore caricamento dashboard Catasto");
+  useEffect(() => {
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === "visible") {
+        void loadCatastoDashboard();
       }
     }
 
-    void loadCatastoDashboard();
-  }, []);
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadCatastoDashboard();
+      }
+    }, DASHBOARD_REFRESH_INTERVAL_MS);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadCatastoDashboard]);
+
+  async function handleRetryBatch(batch: CatastoBatch): Promise<void> {
+    const token = getStoredAccessToken();
+    if (!token) return;
+
+    setRetryBusyId(batch.id);
+    try {
+      if (batch.status === "failed" && batch.failed_items > 0) {
+        await retryFailedCatastoBatch(token, batch.id);
+      }
+      await startCatastoBatch(token, batch.id);
+      await loadCatastoDashboard();
+      setError(null);
+    } catch (retryError) {
+      setError(retryError instanceof Error ? retryError.message : "Errore riavvio batch");
+    } finally {
+      setRetryBusyId(null);
+    }
+  }
 
   const activeBatch = batches.find((batch) => batch.status === "processing");
   const completedToday = batches.filter((batch) => batch.status === "completed").length;
@@ -161,6 +205,7 @@ export default function CatastoDashboardPage() {
                   <th>Totale</th>
                   <th>Operazione</th>
                   <th>Creato</th>
+                  <th>Azioni</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,8 +218,22 @@ export default function CatastoDashboardPage() {
                     </td>
                     <td>{batch.status}</td>
                     <td>{batch.total_items}</td>
-                    <td>{batch.current_operation ?? "—"}</td>
+                    <td><CatastoOperationMessage value={batch.current_operation} /></td>
                     <td>{formatDateTime(batch.created_at)}</td>
+                    <td>
+                      {batch.current_operation === "Retry queued" || (batch.status === "failed" && batch.failed_items > 0) ? (
+                        <button
+                          className="text-sm text-[#1D4E35] transition hover:text-[#143726] disabled:cursor-not-allowed disabled:text-gray-300"
+                          disabled={retryBusyId === batch.id}
+                          onClick={() => void handleRetryBatch(batch)}
+                          type="button"
+                        >
+                          {retryBusyId === batch.id ? "Riprovo..." : "Riprova"}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

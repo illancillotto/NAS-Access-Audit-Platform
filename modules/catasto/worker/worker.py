@@ -80,6 +80,7 @@ class CatastoWorker:
             if batch_id is None:
                 await asyncio.sleep(POLL_INTERVAL_SEC)
                 continue
+            logger.info("Picked batch %s from processing queue", batch_id)
             await self._process_batch(batch_id)
 
     def _install_signal_handlers(self) -> None:
@@ -208,6 +209,8 @@ class CatastoWorker:
             batch = db.get(CatastoBatch, batch_id)
             if batch is None:
                 return
+            batch.current_operation = "Worker picked up batch"
+            db.commit()
             credential = db.scalar(select(CatastoCredential).where(CatastoCredential.user_id == batch.user_id))
             if credential is None:
                 batch.status = CatastoBatchStatus.FAILED.value
@@ -215,6 +218,7 @@ class CatastoWorker:
                 db.commit()
                 return
             password = self.vault.decrypt(credential.sister_password_encrypted)
+            logger.info("Batch %s picked up for user %s", batch_id, batch.user_id)
 
         browser = BrowserSession(
             BrowserSessionConfig(
@@ -226,10 +230,16 @@ class CatastoWorker:
         )
         await browser.start()
         try:
+            self._set_batch_operation(batch_id, "Authenticating with SISTER")
+            logger.info("Batch %s authenticating with SISTER", batch_id)
             await browser.ensure_authenticated(credential.sister_username, password)
+            self._set_batch_operation(batch_id, "SISTER authenticated")
+            logger.info("Batch %s authenticated on SISTER", batch_id)
             while not self.state.stop_requested:
                 next_request = self._next_request_id(batch_id)
                 if next_request == "WAIT":
+                    self._set_batch_operation(batch_id, "Waiting for manual CAPTCHA input")
+                    logger.info("Batch %s waiting for manual CAPTCHA input", batch_id)
                     await asyncio.sleep(2)
                     continue
                 if next_request is None:
@@ -246,6 +256,7 @@ class CatastoWorker:
             await browser.stop()
 
     def _fail_batch(self, batch_id, message: str) -> None:
+        user_message = self._to_user_message(message)
         with SessionLocal() as db:
             batch = db.get(CatastoBatch, batch_id)
             if batch is None:
@@ -263,13 +274,13 @@ class CatastoWorker:
                 }:
                     request.status = CatastoVisuraRequestStatus.FAILED.value
                     request.current_operation = "Failed before visura execution"
-                    request.error_message = message
+                    request.error_message = user_message
                     request.processed_at = datetime.now(timezone.utc)
                     request.captcha_manual_solution = None
                     request.captcha_skip_requested = False
 
             batch.status = CatastoBatchStatus.FAILED.value
-            batch.current_operation = message
+            batch.current_operation = user_message
             batch.completed_at = datetime.now(timezone.utc)
             self._refresh_batch_counts(db, batch)
             db.commit()
@@ -313,6 +324,15 @@ class CatastoWorker:
             batch = db.get(CatastoBatch, batch_id)
             if request is None or batch is None:
                 return
+            logger.info(
+                "Processing request %s for batch %s row=%s comune=%s foglio=%s particella=%s",
+                request_id,
+                batch_id,
+                request.row_index,
+                request.comune,
+                request.foglio,
+                request.particella,
+            )
 
             if request.status == CatastoVisuraRequestStatus.AWAITING_CAPTCHA.value and request.captcha_manual_solution:
                 request.status = CatastoVisuraRequestStatus.PROCESSING.value
@@ -341,16 +361,18 @@ class CatastoWorker:
                 return
             elif request.status != CatastoVisuraRequestStatus.PROCESSING.value:
                 request.status = CatastoVisuraRequestStatus.PROCESSING.value
-                request.current_operation = "Opening SISTER form"
+                request.current_operation = "Queued inside worker"
                 request.attempts += 1
 
             batch.current_operation = f"Processing {request.comune} Fg.{request.foglio} Part.{request.particella}"
             db.commit()
 
+        self._set_request_operation(request_id, "Authenticating SISTER session")
         await browser.ensure_authenticated(
             credential.sister_username,
             self.vault.decrypt(credential.sister_password_encrypted),
         )
+        self._set_request_operation(request_id, "Opening SISTER form")
 
         with SessionLocal() as db:
             request = db.get(CatastoVisuraRequest, request_id)
@@ -368,10 +390,17 @@ class CatastoWorker:
             max_ocr_attempts=CAPTCHA_MAX_OCR_ATTEMPTS,
             get_manual_captcha_decision=lambda image_path: self._wait_for_manual_captcha(batch_id, request_id, image_path),
         )
+        logger.info(
+            "Request %s completed with status=%s error=%s",
+            request_id,
+            result.status,
+            result.error_message,
+        )
         self._persist_flow_result(batch_id, request_id, credential.sister_username, result)
 
     async def _wait_for_manual_captcha(self, batch_id, request_id, image_path: Path) -> ManualCaptchaDecision:
         deadline = datetime.now(timezone.utc) + timedelta(seconds=CAPTCHA_MANUAL_TIMEOUT_SEC)
+        logger.info("Request %s waiting for manual CAPTCHA until %s", request_id, deadline.isoformat())
 
         with SessionLocal() as db:
             request = db.get(CatastoVisuraRequest, request_id)
@@ -393,11 +422,14 @@ class CatastoWorker:
                 if request is None:
                     return ManualCaptchaDecision(text=None, skip=True)
                 if request.captcha_skip_requested:
+                    logger.info("Request %s manual CAPTCHA skipped by user", request_id)
                     return ManualCaptchaDecision(text=None, skip=True)
                 if request.captcha_manual_solution:
+                    logger.info("Request %s manual CAPTCHA received", request_id)
                     return ManualCaptchaDecision(text=request.captcha_manual_solution)
             await asyncio.sleep(2)
 
+        logger.warning("Request %s manual CAPTCHA timed out", request_id)
         return ManualCaptchaDecision(text=None, skip=False)
 
     def _persist_flow_result(self, batch_id, request_id, codice_fiscale: str, result: VisuraFlowResult) -> None:
@@ -450,6 +482,12 @@ class CatastoWorker:
             self._log_captcha_attempt(db, request_id, result)
             self._refresh_batch_counts(db, batch)
             db.commit()
+        logger.info(
+            "Persisted result for request %s batch %s status=%s",
+            request_id,
+            batch_id,
+            result.status,
+        )
 
     def _finalize_batch(self, batch_id) -> None:
         with SessionLocal() as db:
@@ -479,6 +517,22 @@ class CatastoWorker:
         batch.failed_items = sum(1 for item in requests if item.status == CatastoVisuraRequestStatus.FAILED.value)
         batch.skipped_items = sum(1 for item in requests if item.status == CatastoVisuraRequestStatus.SKIPPED.value)
 
+    def _set_batch_operation(self, batch_id, operation: str) -> None:
+        with SessionLocal() as db:
+            batch = db.get(CatastoBatch, batch_id)
+            if batch is None:
+                return
+            batch.current_operation = operation
+            db.commit()
+
+    def _set_request_operation(self, request_id, operation: str) -> None:
+        with SessionLocal() as db:
+            request = db.get(CatastoVisuraRequest, request_id)
+            if request is None:
+                return
+            request.current_operation = operation
+            db.commit()
+
     def _log_captcha_attempt(self, db: Session, request_id, result: VisuraFlowResult) -> None:
         if result.captcha_image_path is None:
             return
@@ -507,6 +561,24 @@ class CatastoWorker:
     def _slugify(value: str) -> str:
         value = value.upper().strip()
         return re.sub(r"[^A-Z0-9]+", "_", value).strip("_")
+
+    @staticmethod
+    def _to_user_message(message: str) -> str:
+        if "Utente SISTER bloccato sul portale Agenzia delle Entrate" in message:
+            return (
+                "Utente SISTER bloccato sul portale Agenzia delle Entrate. "
+                "Verificare se esiste gia' una sessione attiva su un'altra postazione o browser. "
+                "indirizzo link: https://sister3.agenziaentrate.gov.it/Servizi/error_locked.jsp"
+            )
+        if "gia' in sessione" in message or "già in sessione" in message or "error_locked.jsp" in message:
+            return (
+                "Utente SISTER bloccato sul portale Agenzia delle Entrate. "
+                "Verificare se esiste gia' una sessione attiva su un'altra postazione o browser. "
+                "indirizzo link: https://sister3.agenziaentrate.gov.it/Servizi/error_locked.jsp"
+            )
+        if "Credenziali SISTER rifiutate" in message:
+            return "Le credenziali SISTER sono state rifiutate dal portale."
+        return message
 
 
 async def main() -> None:

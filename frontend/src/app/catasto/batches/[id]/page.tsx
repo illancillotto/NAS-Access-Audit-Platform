@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { CatastoOperationMessage } from "@/components/catasto/operation-message";
 import { BatchProgress } from "@/components/catasto/batch-progress";
 import { CaptchaDialog } from "@/components/catasto/captcha-dialog";
 import { CatastoStatusBadge } from "@/components/catasto/status-badge";
@@ -287,8 +288,8 @@ export default function CatastoBatchDetailPage() {
                         <span className="text-xs text-gray-400">{request.tipo_visura}</span>
                       </td>
                       <td><CatastoStatusBadge status={request.status} /></td>
-                      <td>{request.current_operation ?? "—"}</td>
-                      <td className="text-xs text-gray-500">{request.error_message ?? "—"}</td>
+                      <td><CatastoOperationMessage value={request.current_operation} /></td>
+                      <td className="text-xs text-gray-500"><CatastoOperationMessage value={request.error_message} /></td>
                     </tr>
                   ))}
                 </tbody>
