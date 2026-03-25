@@ -41,7 +41,8 @@ def test_ensure_bootstrap_admin_creates_admin_once(monkeypatch) -> None:
     assert second_created is False
     assert first_user.id == second_user.id
     assert first_user.username == "seedadmin"
-    assert first_user.role == "admin"
+    assert first_user.role == "super_admin"
+    assert first_user.enabled_modules == ["accessi", "rete", "inventario"]
 
 
 def test_ensure_bootstrap_admin_updates_existing_admin(monkeypatch) -> None:
@@ -85,6 +86,7 @@ def test_ensure_bootstrap_admin_updates_existing_admin(monkeypatch) -> None:
 
     assert created is False
     assert user.email == "new-admin@example.local"
-    assert user.role == "admin"
+    assert user.role == "super_admin"
     assert user.is_active is True
+    assert user.enabled_modules == ["accessi", "rete", "inventario"]
     assert verify_password("new-secret", user.password_hash) is True

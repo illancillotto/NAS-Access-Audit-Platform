@@ -15,6 +15,7 @@ from app.models.effective_permission import EffectivePermission
 from app.models.nas_group import NasGroup
 from app.models.nas_user import NasUser
 from app.models.permission_entry import PermissionEntry
+from app.models.section_permission import Section
 from app.models.share import Share
 from app.models.snapshot import Snapshot
 from app.models.sync_run import SyncRun
@@ -54,6 +55,15 @@ def setup_database() -> Generator[None, None, None]:
             email="syncadmin@example.local",
             password_hash=hash_password("secret123"),
             role=ApplicationUserRole.ADMIN.value,
+            is_active=True,
+        )
+    )
+    db.add(
+        Section(
+            module="accessi",
+            key="accessi.sync",
+            label="Sync",
+            min_role=ApplicationUserRole.ADMIN.value,
             is_active=True,
         )
     )

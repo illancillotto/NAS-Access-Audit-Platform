@@ -1,17 +1,36 @@
 from datetime import datetime
+import re
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from email_validator import EmailNotValidError, validate_email
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+LOCAL_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.local$", re.IGNORECASE)
+
+
+def normalize_email(value: str) -> str:
+    candidate = value.strip()
+    try:
+        return validate_email(candidate, check_deliverability=False).normalized
+    except EmailNotValidError as exc:
+        if LOCAL_EMAIL_PATTERN.fullmatch(candidate):
+            return candidate.lower()
+        raise ValueError("Invalid email address") from exc
 
 
 class ApplicationUserCreate(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     password: str
     role: str = "viewer"
     is_active: bool = True
     module_accessi: bool = True
     module_rete: bool = False
     module_inventario: bool = False
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_email(value)
 
     @field_validator("password")
     @classmethod
@@ -22,13 +41,20 @@ class ApplicationUserCreate(BaseModel):
 
 
 class ApplicationUserUpdate(BaseModel):
-    email: EmailStr | None = None
+    email: str | None = None
     password: str | None = None
     role: str | None = None
     is_active: bool | None = None
     module_accessi: bool | None = None
     module_rete: bool | None = None
     module_inventario: bool | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_email(value)
 
     @field_validator("password")
     @classmethod
