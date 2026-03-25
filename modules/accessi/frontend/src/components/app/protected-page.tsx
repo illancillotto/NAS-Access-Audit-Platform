@@ -6,7 +6,7 @@ import { PropsWithChildren, type ReactNode, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Topbar } from "@/components/layout/topbar";
-import { getCurrentUser, getDashboardSummary } from "@/lib/api";
+import { getCurrentUser, getDashboardSummary, isAuthError } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
 import type { CurrentUser, DashboardSummary } from "@/types/api";
 
@@ -60,12 +60,16 @@ export function ProtectedPage({
         setLoadError(null);
         setStatusMessage("Sessione backend attiva.");
       } catch (error) {
-        clearStoredAccessToken();
-        setCurrentUser(null);
-        setSummary(emptySummary);
         setLoadError(error instanceof Error ? error.message : "Errore imprevisto");
-        setStatusMessage("Sessione non valida o backend non raggiungibile.");
-        router.replace("/login");
+        if (isAuthError(error)) {
+          clearStoredAccessToken();
+          setCurrentUser(null);
+          setSummary(emptySummary);
+          setStatusMessage("Sessione non valida.");
+          router.replace("/login");
+        } else {
+          setStatusMessage("Backend non raggiungibile o richiesta scaduta.");
+        }
       } finally {
         setIsCheckingSession(false);
       }

@@ -16,6 +16,7 @@ import {
   getEffectivePermissions,
   getNasUsers,
   getShares,
+  isAuthError,
 } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
 import type { CurrentUser, DashboardSummary, EffectivePermission, NasUser, Share } from "@/types/api";
@@ -64,11 +65,13 @@ export default function AccessiPage() {
         setPermissions(permissionItems);
         setLoadError(null);
       } catch (error) {
-        clearStoredAccessToken();
-        setCurrentUser(null);
-        setSummary(emptySummary);
         setLoadError(error instanceof Error ? error.message : "Errore imprevisto");
-        router.replace("/login");
+        if (isAuthError(error)) {
+          clearStoredAccessToken();
+          setCurrentUser(null);
+          setSummary(emptySummary);
+          router.replace("/login");
+        }
       } finally {
         setIsCheckingSession(false);
       }

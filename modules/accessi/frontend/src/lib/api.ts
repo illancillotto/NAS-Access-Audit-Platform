@@ -20,6 +20,20 @@ import type {
 
 const DEFAULT_API_BASE_URL = "/api";
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export function isAuthError(error: unknown): error is ApiError {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 function getApiBaseUrl(): string {
   const value = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
   return value.replace(/\/+$/, "");
@@ -45,7 +59,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       detail = response.statusText || detail;
     }
 
-    throw new Error(detail);
+    throw new ApiError(detail, response.status);
   }
 
   return (await response.json()) as T;

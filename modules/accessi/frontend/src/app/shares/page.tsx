@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { ProtectedPage } from "@/components/app/protected-page";
+import { ShareDetailPanel } from "@/components/app/share-detail-panel";
 import { TableFilters } from "@/components/table/table-filters";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -24,6 +25,7 @@ export default function SharesPage() {
   const [shares, setShares] = useState<Share[]>([]);
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedShareId, setSelectedShareId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sectorFilter, setSectorFilter] = useState<SectorFilter>("all");
 
@@ -46,6 +48,24 @@ export default function SharesPage() {
 
     void loadShares();
   }, []);
+
+  useEffect(() => {
+    if (selectedShareId == null) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedShareId(null);
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [selectedShareId]);
 
   const shareRows = useMemo<ShareRow[]>(() => {
     return shares.map((share) => {
@@ -130,10 +150,11 @@ export default function SharesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredShares.map((share) => (
-            <Link
+            <button
               key={share.id}
-              href={`/shares/${share.id}`}
-              className="block rounded-xl border border-gray-100 bg-white p-4 shadow-panel transition hover:border-gray-200 hover:shadow-sm"
+              className="block rounded-xl border border-gray-100 bg-white p-4 text-left shadow-panel transition hover:border-gray-200 hover:shadow-sm"
+              onClick={() => setSelectedShareId(share.id)}
+              type="button"
             >
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#D3EAD4]">
@@ -153,10 +174,39 @@ export default function SharesPage() {
                 </div>
                 {share.sector ? <p className="mt-2 text-right">{share.sector}</p> : null}
               </div>
-            </Link>
+            </button>
           ))}
         </div>
       )}
+
+      {selectedShareId != null ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#0E1712]/50 p-4 backdrop-blur-sm md:p-8">
+          <button
+            aria-label="Chiudi dettaglio cartella"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setSelectedShareId(null)}
+            type="button"
+          />
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-gray-200 bg-[#F6F7F2] p-4 shadow-[0_30px_80px_rgba(15,25,19,0.18)] md:max-h-[calc(100vh-4rem)] md:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Dettaglio cartella</p>
+                <h3 className="mt-1 text-xl font-medium text-gray-900">Vista rapida operativa</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link className="text-sm font-medium text-[#1D4E35]" href={`/shares/${selectedShareId}`}>
+                  Apri pagina completa
+                </Link>
+                <button className="btn-secondary" onClick={() => setSelectedShareId(null)} type="button">
+                  Chiudi
+                </button>
+              </div>
+            </div>
+
+            <ShareDetailPanel shareId={selectedShareId} compact onClose={() => setSelectedShareId(null)} />
+          </div>
+        </div>
+      ) : null}
     </ProtectedPage>
   );
 }

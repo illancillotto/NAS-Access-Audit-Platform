@@ -43,7 +43,7 @@ export function Sidebar({ currentUser, onLogout, reviewBadge = 0, userBadge = 0 
         <p className="px-2 pb-1 pt-4 text-[10px] font-medium uppercase tracking-widest text-gray-400">Accessi</p>
         <NavItem href="/users" icon={UserIcon} label="Utenti" badge={userBadge || undefined} />
         <NavItem href="/groups" icon={UsersIcon} label="Gruppi" />
-        <NavItem href="/shares" icon={FolderIcon} label="Cartelle condivise" />
+        <NavItem href="/shares" icon={FolderIcon} label="Cartelle Utenti" />
         <NavItem href="/effective-permissions" icon={LockIcon} label="Permessi effettivi" />
 
         <p className="px-2 pb-1 pt-4 text-[10px] font-medium uppercase tracking-widest text-gray-400">Validazione</p>

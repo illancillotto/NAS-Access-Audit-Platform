@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { getCurrentUser, getDashboardSummary } from "@/lib/api";
+import { getCurrentUser, getDashboardSummary, isAuthError } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import type { CurrentUser, DashboardSummary } from "@/types/api";
@@ -93,11 +93,13 @@ export default function HomePage() {
         setSummary(dashboardSummary);
         setLoadError(null);
       } catch (error) {
-        clearStoredAccessToken();
-        setCurrentUser(null);
-        setSummary(emptySummary);
         setLoadError(error instanceof Error ? error.message : "Errore imprevisto");
-        router.replace("/login");
+        if (isAuthError(error)) {
+          clearStoredAccessToken();
+          setCurrentUser(null);
+          setSummary(emptySummary);
+          router.replace("/login");
+        }
       } finally {
         setIsCheckingSession(false);
       }
