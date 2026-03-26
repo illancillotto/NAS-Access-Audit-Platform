@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { getCurrentUser, getDashboardSummary, isAuthError } from "@/lib/api";
+import { getCurrentUser, getDashboardSummary, getMyPermissions, isAuthError } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
 import { cn } from "@/lib/cn";
+import { hasSectionAccess } from "@/lib/section-access";
 import type { CurrentUser, DashboardSummary } from "@/types/api";
 
 type ModuleStatus = "active" | "coming";
@@ -84,6 +85,7 @@ export default function HomePage() {
   const [summary, setSummary] = useState<DashboardSummary>(emptySummary);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [grantedSectionKeys, setGrantedSectionKeys] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadHome() {
@@ -95,13 +97,15 @@ export default function HomePage() {
       }
 
       try {
-        const [user, dashboardSummary] = await Promise.all([
+        const [user, dashboardSummary, permissionSummary] = await Promise.all([
           getCurrentUser(token),
           getDashboardSummary(token),
+          getMyPermissions(token),
         ]);
 
         setCurrentUser(user);
         setSummary(dashboardSummary);
+        setGrantedSectionKeys(permissionSummary.granted_keys);
         setLoadError(null);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : "Errore imprevisto");
@@ -109,6 +113,7 @@ export default function HomePage() {
           clearStoredAccessToken();
           setCurrentUser(null);
           setSummary(emptySummary);
+          setGrantedSectionKeys([]);
           router.replace("/login");
         }
       } finally {
@@ -123,6 +128,7 @@ export default function HomePage() {
     clearStoredAccessToken();
     setCurrentUser(null);
     setSummary(emptySummary);
+    setGrantedSectionKeys([]);
     router.replace("/login");
   }
 
@@ -147,6 +153,8 @@ export default function HomePage() {
       </main>
     );
   }
+
+  const canAccessUsersSection = hasSectionAccess(grantedSectionKeys, "accessi.users");
 
   return (
     <main className="min-h-screen bg-[#0E1712] text-white">
@@ -236,15 +244,33 @@ export default function HomePage() {
                     </p>
 
                     {moduleItem.id === "accessi" ? (
-                      <div className="mt-8 grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-                          <p className="text-xs uppercase tracking-[0.16em] text-white/55">Share</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{summary.shares}</p>
+                      <div className="mt-8 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                            <p className="text-xs uppercase tracking-[0.16em] text-white/55">Share</p>
+                            <p className="mt-2 text-2xl font-semibold text-white">{summary.shares}</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                            <p className="text-xs uppercase tracking-[0.16em] text-white/55">Sync run</p>
+                            <p className="mt-2 text-2xl font-semibold text-white">{summary.sync_runs}</p>
+                          </div>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-                          <p className="text-xs uppercase tracking-[0.16em] text-white/55">Sync run</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{summary.sync_runs}</p>
-                        </div>
+                        {canAccessUsersSection ? (
+                          <Link
+                            href="/accessi/users"
+                            className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+                          >
+                            Gestione utenti
+                          </Link>
+                        ) : (
+                          <span
+                            aria-disabled="true"
+                            className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm font-medium text-white/45"
+                            title="Accesso non abilitato"
+                          >
+                            Gestione utenti non abilitata
+                          </span>
+                        )}
                       </div>
                     ) : moduleItem.id === "catasto" ? (
                       <div className="mt-8 grid grid-cols-2 gap-3">
@@ -264,21 +290,39 @@ export default function HomePage() {
                     )}
 
                     <div className="mt-auto pt-8">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-2 text-sm font-medium",
-                          isActive ? "text-white" : "text-gray-500",
-                        )}
-                      >
-                        {isActive ? "Apri modulo" : "Disponibile prossimamente"}
-                        <span aria-hidden="true">{isActive ? "→" : "·"}</span>
-                      </span>
+                      {moduleItem.id === "accessi" ? (
+                        <Link
+                          href={moduleItem.href}
+                          className="inline-flex items-center gap-2 text-sm font-medium text-white"
+                        >
+                          Apri modulo
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      ) : (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-2 text-sm font-medium",
+                            isActive ? "text-white" : "text-gray-500",
+                          )}
+                        >
+                          {isActive ? "Apri modulo" : "Disponibile prossimamente"}
+                          <span aria-hidden="true">{isActive ? "→" : "·"}</span>
+                        </span>
+                      )}
                     </div>
                   </article>
                 );
 
                 if (!isActive) {
                   return <div key={moduleItem.id}>{cardContent}</div>;
+                }
+
+                if (moduleItem.id === "accessi") {
+                  return (
+                    <div key={moduleItem.id} className="block h-full">
+                      {cardContent}
+                    </div>
+                  );
                 }
 
                 return (

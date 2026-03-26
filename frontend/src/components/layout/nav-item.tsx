@@ -13,6 +13,7 @@ type NavItemProps = {
   badge?: number;
   badgeVariant?: "danger" | "warning";
   match?: "exact" | "prefix";
+  disabled?: boolean;
 };
 
 export function NavItem({
@@ -22,6 +23,7 @@ export function NavItem({
   badge,
   badgeVariant = "warning",
   match = "exact",
+  disabled = false,
 }: NavItemProps) {
   const pathname = usePathname();
   const isActive =
@@ -29,16 +31,17 @@ export function NavItem({
       ? pathname === href || pathname.startsWith(`${href}/`)
       : pathname === href;
 
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
-        isActive
-          ? "bg-[#EAF3E8] font-medium text-[#1D4E35]"
-          : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
-      )}
-    >
+  const className = cn(
+    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+    disabled
+      ? "cursor-not-allowed text-gray-300"
+      : isActive
+        ? "bg-[#EAF3E8] font-medium text-[#1D4E35]"
+        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+  );
+
+  const content = (
+    <>
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1">{label}</span>
       {badge !== undefined ? (
@@ -51,6 +54,20 @@ export function NavItem({
           {badge}
         </span>
       ) : null}
+    </>
+  );
+
+  if (disabled) {
+    return (
+      <span aria-disabled="true" className={className} title="Accesso non abilitato">
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {content}
     </Link>
   );
 }

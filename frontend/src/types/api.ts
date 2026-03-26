@@ -15,6 +15,19 @@ export type CurrentUser = {
   enabled_modules: string[];
 };
 
+export type ResolvedSectionPermission = {
+  section_key: string;
+  section_label: string;
+  module: string;
+  is_granted: boolean;
+  source: string;
+};
+
+export type MyPermissionsResponse = {
+  sections: ResolvedSectionPermission[];
+  granted_keys: string[];
+};
+
 export type DashboardSummary = {
   nas_users: number;
   nas_groups: number;

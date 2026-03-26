@@ -12,9 +12,16 @@ type SidebarProps = {
   onLogout: () => void;
   reviewBadge?: number;
   userBadge?: number;
+  grantedSectionKeys?: string[];
 };
 
-export function Sidebar({ currentUser, onLogout, reviewBadge = 0, userBadge = 0 }: SidebarProps) {
+export function Sidebar({
+  currentUser,
+  onLogout,
+  reviewBadge = 0,
+  userBadge = 0,
+  grantedSectionKeys = [],
+}: SidebarProps) {
   const pathname = usePathname();
   const currentModuleKey =
     pathname.startsWith("/catasto")
@@ -38,7 +45,12 @@ export function Sidebar({ currentUser, onLogout, reviewBadge = 0, userBadge = 0 
     <aside className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-gray-100 bg-white">
       <div className="flex-1 overflow-y-auto">
         <PlatformSidebar currentModuleLabel={currentModuleLabel} />
-        <ModuleSidebar currentModuleKey={currentModuleKey} reviewBadge={reviewBadge} userBadge={userBadge} />
+        <ModuleSidebar
+          currentModuleKey={currentModuleKey}
+          reviewBadge={reviewBadge}
+          userBadge={userBadge}
+          grantedSectionKeys={grantedSectionKeys}
+        />
       </div>
 
       <div className="border-t border-gray-100 px-4 py-3">

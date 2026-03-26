@@ -23,6 +23,7 @@ from app.models.catasto import (
     CatastoVisuraRequest,
     CatastoVisuraRequestStatus,
 )
+from anti_captcha_client import AntiCaptchaClient
 from browser_session import BrowserSession, BrowserSessionConfig
 from captcha_solver import CaptchaSolver
 from credential_vault import WorkerCredentialVault
@@ -34,6 +35,9 @@ CREDENTIAL_MASTER_KEY = os.environ["CREDENTIAL_MASTER_KEY"]
 POLL_INTERVAL_SEC = int(os.getenv("CATASTO_POLL_INTERVAL_SEC", "3"))
 CAPTCHA_MAX_OCR_ATTEMPTS = int(os.getenv("CAPTCHA_MAX_OCR_ATTEMPTS", "3"))
 CAPTCHA_MANUAL_TIMEOUT_SEC = int(os.getenv("CAPTCHA_MANUAL_TIMEOUT_SEC", "300"))
+ANTI_CAPTCHA_API_KEY = os.getenv("ANTI_CAPTCHA_API_KEY", "").strip()
+ANTI_CAPTCHA_POLL_INTERVAL_SEC = int(os.getenv("ANTI_CAPTCHA_POLL_INTERVAL_SEC", "3"))
+ANTI_CAPTCHA_TIMEOUT_SEC = int(os.getenv("ANTI_CAPTCHA_TIMEOUT_SEC", "120"))
 BETWEEN_VISURE_DELAY_SEC = int(os.getenv("BETWEEN_VISURE_DELAY_SEC", "5"))
 SESSION_TIMEOUT_SEC = int(os.getenv("SESSION_TIMEOUT_SEC", "1680"))
 DOCUMENT_STORAGE_PATH = Path(os.getenv("CATASTO_DOCUMENT_STORAGE_PATH", "/data/catasto/documents"))
@@ -62,6 +66,15 @@ class CatastoWorker:
         self.state = WorkerState()
         self.vault = WorkerCredentialVault(CREDENTIAL_MASTER_KEY)
         self.captcha_solver = CaptchaSolver()
+        self.anti_captcha_client = (
+            AntiCaptchaClient(
+                api_key=ANTI_CAPTCHA_API_KEY,
+                poll_interval_sec=ANTI_CAPTCHA_POLL_INTERVAL_SEC,
+                timeout_sec=ANTI_CAPTCHA_TIMEOUT_SEC,
+            )
+            if ANTI_CAPTCHA_API_KEY
+            else None
+        )
         DEBUG_ARTIFACTS_PATH.mkdir(parents=True, exist_ok=True)
 
     async def run(self) -> None:
@@ -396,6 +409,7 @@ class CatastoWorker:
             captcha_solver=self.captcha_solver,
             max_ocr_attempts=CAPTCHA_MAX_OCR_ATTEMPTS,
             get_manual_captcha_decision=lambda image_path: self._wait_for_manual_captcha(batch_id, request_id, image_path),
+            solve_external_captcha=self._solve_external_captcha if self.anti_captcha_client is not None else None,
             update_operation=lambda operation: self._set_request_operation(request_id, operation),
         )
         logger.info(
@@ -439,6 +453,14 @@ class CatastoWorker:
 
         logger.warning("Richiesta %s timeout CAPTCHA manuale", request_id)
         return ManualCaptchaDecision(text=None, skip=False)
+
+    async def _solve_external_captcha(self, image_bytes: bytes) -> str | None:
+        if self.anti_captcha_client is None:
+            return None
+        logger.info("Invio CAPTCHA al servizio esterno Anti-Captcha")
+        text = await self.anti_captcha_client.solve_image_to_text(image_bytes)
+        logger.info("Risposta ricevuta da Anti-Captcha: testo_presente=%s", bool(text))
+        return text
 
     def _persist_flow_result(self, batch_id, request_id, codice_fiscale: str, result: VisuraFlowResult) -> None:
         with SessionLocal() as db:
@@ -544,12 +566,14 @@ class CatastoWorker:
     def _log_captcha_attempt(self, db: Session, request_id, result: VisuraFlowResult) -> None:
         if result.captcha_image_path is None:
             return
-        method = "manual" if result.captcha_image_path.name.endswith("_manual.png") else "ocr"
+        method = result.captcha_method
+        if method is None:
+            method = "manual" if result.captcha_image_path.name.endswith("_manual.png") else "ocr"
         db.add(
             CatastoCaptchaLog(
                 request_id=request_id,
                 image_path=str(result.captcha_image_path),
-                ocr_text=result.last_ocr_text if method == "ocr" else None,
+                ocr_text=result.last_ocr_text if method in {"ocr", "external"} else None,
                 manual_text=result.last_ocr_text if method == "manual" else None,
                 is_correct=result.status == "completed",
                 method=method,

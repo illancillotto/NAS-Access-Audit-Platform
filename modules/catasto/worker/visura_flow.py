@@ -24,6 +24,7 @@ class VisuraFlowResult:
     file_path: Path | None = None
     file_size: int | None = None
     captcha_image_path: Path | None = None
+    captcha_method: str | None = None
     last_ocr_text: str | None = None
     error_message: str | None = None
 
@@ -36,6 +37,7 @@ async def execute_visura_flow(
     captcha_solver: CaptchaSolver,
     max_ocr_attempts: int,
     get_manual_captcha_decision: Callable[[Path], Awaitable[ManualCaptchaDecision]],
+    solve_external_captcha: Callable[[bytes], Awaitable[str | None]] | None = None,
     update_operation: Callable[[str], None] | None = None,
 ) -> VisuraFlowResult:
     if update_operation is not None:
@@ -73,11 +75,44 @@ async def execute_visura_flow(
                 file_path=document_path,
                 file_size=file_size,
                 captcha_image_path=captcha_path,
+                captcha_method="ocr",
                 last_ocr_text=ocr_text,
             )
 
         logger.info("Richiesta %s CAPTCHA rifiutato al tentativo OCR %s", request.id, attempt)
         await asyncio.sleep(1)
+
+    if solve_external_captcha is not None:
+        if update_operation is not None:
+            update_operation("Tentativo CAPTCHA servizio esterno")
+        logger.info("Richiesta %s tentativo CAPTCHA servizio esterno", request.id)
+        captcha_bytes = await browser.capture_captcha_image()
+        captcha_path = captcha_dir / f"{request.id}_external.png"
+        captcha_path.parent.mkdir(parents=True, exist_ok=True)
+        captcha_path.write_bytes(captcha_bytes)
+
+        try:
+            external_text = await solve_external_captcha(captcha_bytes)
+        except Exception:
+            logger.exception("Richiesta %s fallback Anti-Captcha fallito", request.id)
+        else:
+            if not external_text:
+                logger.info("Richiesta %s Anti-Captcha ha restituito testo vuoto", request.id)
+            elif await browser.submit_captcha(external_text):
+                if update_operation is not None:
+                    update_operation("Download PDF in corso")
+                logger.info("Richiesta %s CAPTCHA accettato tramite servizio esterno", request.id)
+                file_size = await browser.download_pdf(document_path)
+                return VisuraFlowResult(
+                    status="completed",
+                    file_path=document_path,
+                    file_size=file_size,
+                    captcha_image_path=captcha_path,
+                    captcha_method="external",
+                    last_ocr_text=external_text,
+                )
+            else:
+                logger.info("Richiesta %s CAPTCHA rifiutato dal portale dopo servizio esterno", request.id)
 
     if update_operation is not None:
         update_operation("Richiesta CAPTCHA manuale")
@@ -92,6 +127,7 @@ async def execute_visura_flow(
         return VisuraFlowResult(
             status="skipped",
             captcha_image_path=captcha_path,
+            captcha_method="manual",
             last_ocr_text=last_ocr_text,
             error_message="Skipped after manual CAPTCHA request",
         )
@@ -101,6 +137,7 @@ async def execute_visura_flow(
         return VisuraFlowResult(
             status="failed",
             captcha_image_path=captcha_path,
+            captcha_method="manual",
             last_ocr_text=last_ocr_text,
             error_message="Manual CAPTCHA response missing",
         )
@@ -110,6 +147,7 @@ async def execute_visura_flow(
         return VisuraFlowResult(
             status="failed",
             captcha_image_path=captcha_path,
+            captcha_method="manual",
             last_ocr_text=last_ocr_text,
             error_message="Manual CAPTCHA solution rejected by SISTER",
         )
@@ -123,5 +161,6 @@ async def execute_visura_flow(
         file_path=document_path,
         file_size=file_size,
         captcha_image_path=captcha_path,
+        captcha_method="manual",
         last_ocr_text=decision.text,
     )

@@ -14,6 +14,7 @@ export default function UserDetailPage() {
       title="Dettaglio utente"
       description="Vista analitica di permessi effettivi, review e tracce operative del singolo utente NAS."
       breadcrumb="Utenti"
+      requiredSection="accessi.users"
     >
       <UserDetailPanel userId={userId} />
     </ProtectedPage>

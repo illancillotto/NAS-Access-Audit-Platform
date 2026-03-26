@@ -14,11 +14,13 @@ import {
   getCurrentUser,
   getDashboardSummary,
   getEffectivePermissions,
-  getNasUsers,
+  getMyPermissions,
+  getNasUsersForUsersSection,
   getShares,
   isAuthError,
 } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
+import { hasSectionAccess } from "@/lib/section-access";
 import type { CurrentUser, DashboardSummary, EffectivePermission, NasUser, Share } from "@/types/api";
 
 const emptySummary: DashboardSummary = {
@@ -39,6 +41,7 @@ export default function AccessiPage() {
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [grantedSectionKeys, setGrantedSectionKeys] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -50,16 +53,19 @@ export default function AccessiPage() {
       }
 
       try {
-        const [user, dashboardSummary, nasUsers, shareItems, permissionItems] = await Promise.all([
+        const [user, dashboardSummary, permissionSummary, shareItems, permissionItems] = await Promise.all([
           getCurrentUser(token),
           getDashboardSummary(token),
-          getNasUsers(token),
+          getMyPermissions(token),
           getShares(token),
           getEffectivePermissions(token),
         ]);
+        const canAccessUsersSection = hasSectionAccess(permissionSummary.granted_keys, "accessi.users");
+        const nasUsers = canAccessUsersSection ? await getNasUsersForUsersSection(token) : [];
 
         setCurrentUser(user);
         setSummary(dashboardSummary);
+        setGrantedSectionKeys(permissionSummary.granted_keys);
         setUsers(nasUsers);
         setShares(shareItems);
         setPermissions(permissionItems);
@@ -70,6 +76,7 @@ export default function AccessiPage() {
           clearStoredAccessToken();
           setCurrentUser(null);
           setSummary(emptySummary);
+          setGrantedSectionKeys([]);
           router.replace("/login");
         }
       } finally {
@@ -83,6 +90,7 @@ export default function AccessiPage() {
   function handleLogout(): void {
     setCurrentUser(null);
     setSummary(emptySummary);
+    setGrantedSectionKeys([]);
     router.replace("/login");
   }
 
@@ -143,6 +151,7 @@ export default function AccessiPage() {
       });
   }, [permissions, shares, users]);
   const deniedCount = permissions.filter((item) => item.is_denied).length;
+  const canAccessUsersSection = hasSectionAccess(grantedSectionKeys, "accessi.users");
 
   if (isCheckingSession || !currentUser) {
     return (
@@ -172,6 +181,7 @@ export default function AccessiPage() {
       onLogout={handleLogout}
       reviewBadge={summary.reviews}
       userBadge={summary.nas_users}
+      grantedSectionKeys={grantedSectionKeys}
     >
       <Topbar
         pageTitle="Dashboard"
@@ -222,27 +232,37 @@ export default function AccessiPage() {
                   <p className="section-title">Utenti recenti con accesso</p>
                   <p className="section-copy">Ultimi utenti presenti nel dominio sincronizzato.</p>
                 </div>
-                <Link href="/accessi/users" className="text-sm font-medium text-[#1D4E35]">
-                  Tutti gli utenti
-                </Link>
+                {canAccessUsersSection ? (
+                  <Link href="/accessi/users" className="text-sm font-medium text-[#1D4E35]">
+                    Tutti gli utenti
+                  </Link>
+                ) : (
+                  <span className="text-sm font-medium text-gray-400">Accesso riservato</span>
+                )}
               </div>
               <div className="space-y-3">
-                {recentUsers.map((user) => (
-                  <Link
-                    key={user.id}
-                    href={`/accessi/users/${user.id}`}
-                    className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-3 transition hover:border-gray-200 hover:bg-gray-50"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#D3EAD4] text-[#1D4E35]">
-                      <UserIcon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">{user.username}</p>
-                      <p className="truncate text-xs text-gray-400">{user.full_name ?? "Nome non disponibile"}</p>
-                    </div>
-                    <ChevronRightIcon className="h-4 w-4 text-gray-300" />
-                  </Link>
-                ))}
+                {canAccessUsersSection ? (
+                  recentUsers.map((user) => (
+                    <Link
+                      key={user.id}
+                      href={`/accessi/users/${user.id}`}
+                      className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-3 transition hover:border-gray-200 hover:bg-gray-50"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#D3EAD4] text-[#1D4E35]">
+                        <UserIcon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900">{user.username}</p>
+                        <p className="truncate text-xs text-gray-400">{user.full_name ?? "Nome non disponibile"}</p>
+                      </div>
+                      <ChevronRightIcon className="h-4 w-4 text-gray-300" />
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-500">
+                    La sezione utenti e visibile solo per admin, super admin o utenti abilitati.
+                  </div>
+                )}
               </div>
             </article>
 

@@ -33,7 +33,9 @@ UPLOAD_COLUMN_ALIASES = {
     "catasto": "catasto",
     "sezione": "sezione",
     "foglio": "foglio",
+    "fg": "foglio",
     "particella": "particella",
+    "mapp": "particella",
     "subalterno": "subalterno",
     "tipo_visura": "tipo_visura",
     "tipovisura": "tipo_visura",
@@ -82,6 +84,9 @@ class ValidatedVisuraRow:
     particella: str
     subalterno: str | None
     tipo_visura: str
+    status: str = CatastoVisuraRequestStatus.PENDING.value
+    current_operation: str = "Pending"
+    error_message: str | None = None
 
 
 def normalize_lookup_value(value: str) -> str:
@@ -99,6 +104,20 @@ def clean_cell(value: object) -> str:
     if isinstance(value, str):
         return value.strip()
     return str(value).strip()
+
+
+def _is_legacy_excel_layout(columns: set[str]) -> bool:
+    return {"comune", "foglio", "particella"}.issubset(columns) and "catasto" not in columns and "tipo_visura" not in columns
+
+
+def _build_comune_code_lookup(db: Session) -> dict[str, object]:
+    by_name = get_catasto_comuni_lookup(db)
+    by_code: dict[str, object] = {}
+    for comune in by_name.values():
+        code_prefix = clean_cell(comune.codice_sister).split("#", maxsplit=1)[0].upper()
+        if code_prefix:
+            by_code[code_prefix] = comune
+    return by_code
 
 
 def load_upload_records(filename: str, content: bytes) -> list[dict[str, str]]:
@@ -132,6 +151,14 @@ def load_upload_records(filename: str, content: bytes) -> list[dict[str, str]]:
         rename_map[column] = canonical
 
     dataframe = dataframe.rename(columns=rename_map)
+    for optional_column in ("sezione", "subalterno"):
+        if optional_column not in dataframe.columns:
+            dataframe[optional_column] = ""
+
+    if _is_legacy_excel_layout(set(dataframe.columns)):
+        dataframe["catasto"] = "Terreni"
+        dataframe["tipo_visura"] = "Sintetica"
+
     missing = sorted(REQUIRED_UPLOAD_COLUMNS - set(dataframe.columns))
     if missing:
         raise BatchValidationError(
@@ -139,22 +166,42 @@ def load_upload_records(filename: str, content: bytes) -> list[dict[str, str]]:
             errors=[{"missing_columns": missing}],
         )
 
-    for optional_column in ("sezione", "subalterno"):
-        if optional_column not in dataframe.columns:
-            dataframe[optional_column] = ""
-
     return [{key: clean_cell(value) for key, value in row.items()} for row in dataframe.to_dict(orient="records")]
 
 
 def validate_visure_records(db: Session, records: list[dict[str, str]]) -> list[ValidatedVisuraRow]:
     comune_lookup = get_catasto_comuni_lookup(db)
+    comune_code_lookup = _build_comune_code_lookup(db)
     errors: list[dict[str, object]] = []
     validated_rows: list[ValidatedVisuraRow] = []
 
     for row_index, record in enumerate(records, start=1):
         row_errors: list[str] = []
         comune_value = clean_cell(record.get("comune"))
-        comune = comune_lookup.get(normalize_lookup_value(comune_value)) if comune_value else None
+        if comune_value.upper() == "UE":
+            validated_rows.append(
+                ValidatedVisuraRow(
+                    row_index=row_index,
+                    comune="UE",
+                    comune_codice="UE",
+                    catasto=ALLOWED_CATASTO["terreni"],
+                    sezione=None,
+                    foglio=clean_cell(record.get("foglio")) or "-",
+                    particella=clean_cell(record.get("particella")) or "-",
+                    subalterno=clean_cell(record.get("subalterno")) or None,
+                    tipo_visura=ALLOWED_TIPO_VISURA["sintetica"],
+                    status=CatastoVisuraRequestStatus.SKIPPED.value,
+                    current_operation="Record UE saltato in import",
+                    error_message="Record saltato: il valore Comune e' UE.",
+                )
+            )
+            continue
+
+        comune = None
+        if comune_value:
+            comune = comune_lookup.get(normalize_lookup_value(comune_value))
+            if comune is None:
+                comune = comune_code_lookup.get(comune_value.upper())
         catasto_value = ALLOWED_CATASTO.get(normalize_lookup_value(clean_cell(record.get("catasto"))))
         foglio_value = clean_cell(record.get("foglio"))
         particella_value = clean_cell(record.get("particella"))
@@ -257,12 +304,17 @@ def create_batch_from_validated_rows(
             particella=row.particella,
             subalterno=row.subalterno,
             tipo_visura=row.tipo_visura,
-            status=CatastoVisuraRequestStatus.PENDING.value,
-            current_operation="Pending",
+            status=row.status,
+            current_operation=row.current_operation,
+            error_message=row.error_message,
+            processed_at=datetime.now(UTC) if row.status == CatastoVisuraRequestStatus.SKIPPED.value else None,
         )
         for row in rows
     ]
     db.add_all(requests)
+    recalculate_batch_counters(batch, requests)
+    if batch.skipped_items:
+        batch.current_operation = f"{batch.skipped_items} record saltati in import"
     db.commit()
     db.refresh(batch)
     return batch, requests

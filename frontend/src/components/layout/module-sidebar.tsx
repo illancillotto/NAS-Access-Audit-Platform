@@ -17,13 +17,17 @@ type ModuleSidebarProps = {
   currentModuleKey: "accessi" | "network" | "inventory" | "catasto";
   reviewBadge?: number;
   userBadge?: number;
+  grantedSectionKeys?: string[];
 };
 
 export function ModuleSidebar({
   currentModuleKey,
   reviewBadge = 0,
   userBadge = 0,
+  grantedSectionKeys = [],
 }: ModuleSidebarProps) {
+  const canAccessUsersSection = grantedSectionKeys.includes("accessi.users");
+
   if (currentModuleKey === "accessi") {
     return (
       <div className="space-y-0.5 px-2 pb-3">
@@ -32,7 +36,14 @@ export function ModuleSidebar({
         <NavItem href="/accessi/sync" icon={RefreshIcon} label="Sincronizzazione" />
 
         <p className="px-2 pb-1 pt-4 text-[10px] font-medium uppercase tracking-widest text-gray-400">Accessi</p>
-        <NavItem href="/accessi/users" icon={UserIcon} label="Utenti" badge={userBadge || undefined} match="prefix" />
+        <NavItem
+          href="/accessi/users"
+          icon={UserIcon}
+          label="Utenti"
+          badge={canAccessUsersSection ? userBadge || undefined : undefined}
+          match="prefix"
+          disabled={!canAccessUsersSection}
+        />
         <NavItem href="/accessi/groups" icon={UsersIcon} label="Gruppi" />
         <NavItem href="/accessi/shares" icon={FolderIcon} label="Cartelle condivise" match="prefix" />
         <NavItem href="/accessi/effective-permissions" icon={LockIcon} label="Permessi effettivi" />

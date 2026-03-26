@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_active_user
+from app.api.deps import require_active_user, require_section
 from app.core.database import get_db
 from app.models.application_user import ApplicationUser
 from app.schemas.audit import (
@@ -37,6 +37,14 @@ def dashboard_summary(
 @router.get("/nas-users", response_model=list[NasUserResponse])
 def nas_users(
     _: Annotated[ApplicationUser, Depends(require_active_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[NasUserResponse]:
+    return [NasUserResponse.model_validate(item) for item in get_nas_users(db)]
+
+
+@router.get("/nas-users/section", response_model=list[NasUserResponse])
+def nas_users_section(
+    _: Annotated[ApplicationUser, Depends(require_section("accessi.users"))],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[NasUserResponse]:
     return [NasUserResponse.model_validate(item) for item in get_nas_users(db)]

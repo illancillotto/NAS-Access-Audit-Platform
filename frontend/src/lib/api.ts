@@ -16,6 +16,7 @@ import type {
   EffectivePermission,
   EffectivePermissionPreview,
   LoginResponse,
+  MyPermissionsResponse,
   NasGroup,
   NasUser,
   PermissionEntryInput,
@@ -166,6 +167,14 @@ export async function getCurrentUser(token: string): Promise<CurrentUser> {
   });
 }
 
+export async function getMyPermissions(token: string): Promise<MyPermissionsResponse> {
+  return request<MyPermissionsResponse>("/auth/my-permissions", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function getDashboardSummary(token: string): Promise<DashboardSummary> {
   return request<DashboardSummary>("/dashboard/summary", {
     headers: {
@@ -184,6 +193,14 @@ export async function getShares(token: string): Promise<Share[]> {
 
 export async function getNasUsers(token: string): Promise<NasUser[]> {
   return request<NasUser[]>("/nas-users", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getNasUsersForUsersSection(token: string): Promise<NasUser[]> {
+  return request<NasUser[]>("/nas-users/section", {
     headers: {
       Authorization: `Bearer ${token}`,
     },

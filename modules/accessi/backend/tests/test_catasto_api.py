@@ -4,6 +4,7 @@ from io import BytesIO
 import zipfile
 
 from cryptography.fernet import Fernet
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -388,6 +389,65 @@ def test_create_batch_rejects_invalid_rows_with_detail() -> None:
     assert detail["message"] == "File validation failed"
     assert detail["errors"][0]["row_index"] == 1
     assert "Comune non valido o non censito in catasto_comuni." in detail["errors"][0]["errors"]
+
+
+def test_create_batch_from_legacy_xlsx_maps_comune_code_and_skips_ue() -> None:
+    client.post(
+        "/catasto/credentials",
+        headers=auth_headers(),
+        json={"sister_username": "RSSMRA80A01G113X", "sister_password": "sister-secret"},
+    )
+
+    dataframe = pd.DataFrame(
+        [
+            {
+                "Scheda": "689_W",
+                "Intestazione": "CORRIAS Marco",
+                "FG": 34,
+                "Mapp": "626",
+                "Superf.": 944,
+                "Maglia": "118",
+                "Lotto": "3",
+                "Comune": "E972",
+            },
+            {
+                "Scheda": "689_W",
+                "Intestazione": "CORRIAS Marco",
+                "FG": 35,
+                "Mapp": "700",
+                "Superf.": 500,
+                "Maglia": "118",
+                "Lotto": "3",
+                "Comune": "UE",
+            },
+        ]
+    )
+    buffer = BytesIO()
+    dataframe.to_excel(buffer, index=False)
+
+    response = client.post(
+        "/catasto/batches",
+        headers=auth_headers(),
+        files={"file": ("FileDiPartenza.xlsx", buffer.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"name": "Import legacy xlsx"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["total_items"] == 2
+    assert payload["skipped_items"] == 1
+    assert payload["current_operation"] == "1 record saltati in import"
+
+    first_request = payload["requests"][0]
+    assert first_request["comune"] == "Marrubiu"
+    assert first_request["comune_codice"] == "E972#MARRUBIU#0#0"
+    assert first_request["catasto"] == "Terreni"
+    assert first_request["tipo_visura"] == "Sintetica"
+
+    skipped_request = payload["requests"][1]
+    assert skipped_request["status"] == "skipped"
+    assert skipped_request["current_operation"] == "Record UE saltato in import"
+    assert skipped_request["error_message"] == "Record saltato: il valore Comune e' UE."
 
 
 def test_create_single_visura_auto_starts_batch_and_exposes_request_status() -> None:

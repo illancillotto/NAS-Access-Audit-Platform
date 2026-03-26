@@ -6,8 +6,9 @@ import { PropsWithChildren, type ReactNode, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Topbar } from "@/components/layout/topbar";
-import { getCurrentUser, getDashboardSummary, isAuthError } from "@/lib/api";
+import { getCurrentUser, getDashboardSummary, getMyPermissions, isAuthError } from "@/lib/api";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
+import { hasSectionAccess } from "@/lib/section-access";
 import type { CurrentUser, DashboardSummary } from "@/types/api";
 
 type ProtectedPageProps = PropsWithChildren<{
@@ -15,6 +16,7 @@ type ProtectedPageProps = PropsWithChildren<{
   description: string;
   breadcrumb?: string;
   topbarActions?: ReactNode;
+  requiredSection?: string;
 }>;
 
 const emptySummary: DashboardSummary = {
@@ -31,6 +33,7 @@ export function ProtectedPage({
   description,
   breadcrumb,
   topbarActions,
+  requiredSection,
   children,
 }: ProtectedPageProps) {
   const router = useRouter();
@@ -39,6 +42,7 @@ export function ProtectedPage({
   const [statusMessage, setStatusMessage] = useState("Accedi per caricare dati dal backend.");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [grantedSectionKeys, setGrantedSectionKeys] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadSession() {
@@ -50,13 +54,15 @@ export function ProtectedPage({
       }
 
       try {
-        const [user, dashboardSummary] = await Promise.all([
+        const [user, dashboardSummary, permissionSummary] = await Promise.all([
           getCurrentUser(token),
           getDashboardSummary(token),
+          getMyPermissions(token),
         ]);
 
         setCurrentUser(user);
         setSummary(dashboardSummary);
+        setGrantedSectionKeys(permissionSummary.granted_keys);
         setLoadError(null);
         setStatusMessage("Sessione backend attiva.");
       } catch (error) {
@@ -65,6 +71,7 @@ export function ProtectedPage({
           clearStoredAccessToken();
           setCurrentUser(null);
           setSummary(emptySummary);
+          setGrantedSectionKeys([]);
           setStatusMessage("Sessione non valida.");
           router.replace("/login");
         } else {
@@ -82,6 +89,7 @@ export function ProtectedPage({
     setCurrentUser(null);
     setLoadError(null);
     setSummary(emptySummary);
+    setGrantedSectionKeys([]);
     setStatusMessage("Sessione chiusa. Effettua di nuovo il login.");
     router.replace("/login");
   }
@@ -106,12 +114,41 @@ export function ProtectedPage({
     );
   }
 
+  const isSectionAllowed = requiredSection ? hasSectionAccess(grantedSectionKeys, requiredSection) : true;
+
+  if (!isSectionAllowed) {
+    return (
+      <AppShell
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        reviewBadge={summary.reviews}
+        userBadge={summary.nas_users}
+        grantedSectionKeys={grantedSectionKeys}
+      >
+        <Topbar pageTitle={title} breadcrumb={breadcrumb} actions={topbarActions} />
+        <section className="page-body">
+          <div className="mb-6">
+            <h2 className="page-heading">{title}</h2>
+            <p className="mt-1 text-sm text-gray-500">{description}</p>
+          </div>
+          <article className="panel-card">
+            <p className="text-sm font-medium text-red-700">Accesso non autorizzato</p>
+            <p className="mt-2 text-sm text-gray-600">
+              Questa sezione e disponibile solo per admin, super admin o utenti esplicitamente abilitati.
+            </p>
+          </article>
+        </section>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       currentUser={currentUser}
       onLogout={handleLogout}
       reviewBadge={summary.reviews}
       userBadge={summary.nas_users}
+      grantedSectionKeys={grantedSectionKeys}
     >
       <Topbar pageTitle={title} breadcrumb={breadcrumb} actions={topbarActions} />
       <section className="page-body">

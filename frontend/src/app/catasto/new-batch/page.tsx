@@ -136,7 +136,10 @@ export default function CatastoNewBatchPage() {
           <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
             <div>
               <p className="section-title">Preview batch</p>
-              <p className="section-copy">{draftBatch.name ?? draftBatch.id} · {draftBatch.total_items} richieste validate</p>
+              <p className="section-copy">
+                {draftBatch.name ?? draftBatch.id} · {draftBatch.total_items} righe importate
+                {draftBatch.skipped_items > 0 ? ` · ${draftBatch.skipped_items} record saltati` : ""}
+              </p>
             </div>
             <button className="btn-primary" disabled={busy} onClick={() => void handleStart()} type="button">
               Avvia batch
@@ -151,6 +154,7 @@ export default function CatastoNewBatchPage() {
                   <th>Riferimento</th>
                   <th>Tipo</th>
                   <th>Stato</th>
+                  <th>Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,6 +165,7 @@ export default function CatastoNewBatchPage() {
                     <td>Fg.{request.foglio} Part.{request.particella}{request.subalterno ? ` Sub.${request.subalterno}` : ""}</td>
                     <td>{request.tipo_visura}</td>
                     <td><CatastoStatusBadge status={request.status} /></td>
+                    <td>{request.error_message ?? request.current_operation ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

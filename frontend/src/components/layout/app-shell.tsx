@@ -11,6 +11,7 @@ type AppShellProps = PropsWithChildren<{
   onLogout?: () => void;
   reviewBadge?: number;
   userBadge?: number;
+  grantedSectionKeys?: string[];
 }>;
 
 export function AppShell({
@@ -19,6 +20,7 @@ export function AppShell({
   onLogout,
   reviewBadge = 0,
   userBadge = 0,
+  grantedSectionKeys = [],
 }: AppShellProps) {
   function handleLogout(): void {
     clearStoredAccessToken();
@@ -36,6 +38,7 @@ export function AppShell({
         onLogout={handleLogout}
         reviewBadge={reviewBadge}
         userBadge={userBadge}
+        grantedSectionKeys={grantedSectionKeys}
       />
       <main className="min-w-0 flex-1">{children}</main>
     </div>

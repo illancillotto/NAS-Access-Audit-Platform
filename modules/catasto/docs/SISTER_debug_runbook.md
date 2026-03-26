@@ -48,6 +48,8 @@ Il worker oggi:
 - gestisce l'informativa privacy
 - prova a chiudere una sessione SISTER già attiva
 - aspetta alcuni secondi dopo `CloseSessionsSis` prima di ritentare il login
+- usa OCR locale Tesseract per i CAPTCHA testuali
+- può fare fallback su Anti-Captcha se configurato in `.env`
 
 Artifact salvati in:
 
@@ -218,6 +220,36 @@ Utente SISTER bloccato sul portale Agenzia delle Entrate. Verificare se esiste g
 ```
 
 Nel frontend il link finale viene reso cliccabile.
+
+## Strategia CAPTCHA
+
+Ordine attuale dei tentativi:
+
+1. OCR locale con Tesseract
+2. fallback Anti-Captcha `ImageToTextTask` se `ANTI_CAPTCHA_API_KEY` è configurata
+3. richiesta CAPTCHA manuale all'utente
+
+Variabili ambiente:
+
+```text
+ANTI_CAPTCHA_API_KEY=
+ANTI_CAPTCHA_POLL_INTERVAL_SEC=3
+ANTI_CAPTCHA_TIMEOUT_SEC=120
+```
+
+Dettagli implementativi:
+
+- il fallback esterno è inserito in `modules/catasto/worker/visura_flow.py`
+- il client API è in `modules/catasto/worker/anti_captcha_client.py`
+- i log CAPTCHA distinguono `ocr`, `external`, `manual`
+- se Anti-Captcha fallisce o restituisce un testo non accettato da SISTER, il flusso continua comunque verso il CAPTCHA manuale
+
+Riferimenti ufficiali usati per l'integrazione:
+
+- `createTask`: `https://anti-captcha.com/it/apidoc/methods/createTask`
+- `getTaskResult`: `https://anti-captcha.com/it/apidoc/methods/getTaskResult`
+- `ImageToTextTask`: `https://anti-captcha.com/it/apidoc/task-types/ImageToTextTask`
+- errori API: `https://anti-captcha.com/it/apidoc/errors`
 
 ## Informazioni da tracciare sempre
 

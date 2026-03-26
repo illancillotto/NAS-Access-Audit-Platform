@@ -12,7 +12,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PermissionBadge, type PermissionLevel } from "@/components/ui/permission-badge";
 import { Badge } from "@/components/ui/badge";
-import { getEffectivePermissions, getNasGroups, getNasUsers } from "@/lib/api";
+import { getEffectivePermissions, getNasGroups, getNasUsersForUsersSection } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { getAnomalousPermissions } from "@/lib/permissions";
 import { getPermissionLevel } from "@/lib/presentation";
@@ -73,7 +73,7 @@ export default function UsersPage() {
 
       try {
         const [userItems, groupItems, permissionItems] = await Promise.all([
-          getNasUsers(token),
+          getNasUsersForUsersSection(token),
           getNasGroups(token),
           getEffectivePermissions(token),
         ]);
@@ -223,6 +223,7 @@ export default function UsersPage() {
       title="Utenti NAS"
       description="Vista amministrativa degli utenti sincronizzati con ricerca, stato operativo e accessi calcolati."
       breadcrumb="Accessi"
+      requiredSection="accessi.users"
     >
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 

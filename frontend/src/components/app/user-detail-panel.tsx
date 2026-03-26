@@ -10,8 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SearchIcon } from "@/components/ui/icons";
 import { PermissionBadge } from "@/components/ui/permission-badge";
 import { SourceTag } from "@/components/ui/source-tag";
-import { useDomainData } from "@/hooks/use-domain-data";
-import { getEffectivePermissions, getReviews } from "@/lib/api";
+import { getEffectivePermissions, getNasGroups, getNasUsersForUsersSection, getReviews, getShares } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
   buildPermissionTree,
@@ -23,7 +22,7 @@ import {
 } from "@/lib/permissions";
 import { getPermissionLevel } from "@/lib/presentation";
 import { cn } from "@/lib/cn";
-import type { EffectivePermission, Review } from "@/types/api";
+import type { EffectivePermission, NasGroup, NasUser, Review, Share } from "@/types/api";
 
 type TabKey = "permissions" | "reviews" | "activity";
 
@@ -35,10 +34,12 @@ type UserDetailPanelProps = {
 
 export function UserDetailPanel({ userId, compact = false, onClose }: UserDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("permissions");
+  const [users, setUsers] = useState<NasUser[]>([]);
+  const [groups, setGroups] = useState<NasGroup[]>([]);
+  const [shares, setShares] = useState<Share[]>([]);
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const { users, groups, shares } = useDomainData();
 
   useEffect(() => {
     async function loadDetails() {
@@ -46,10 +47,16 @@ export function UserDetailPanel({ userId, compact = false, onClose }: UserDetail
       if (!token) return;
 
       try {
-        const [permissionItems, reviewItems] = await Promise.all([
+        const [userItems, groupItems, shareItems, permissionItems, reviewItems] = await Promise.all([
+          getNasUsersForUsersSection(token),
+          getNasGroups(token),
+          getShares(token),
           getEffectivePermissions(token),
           getReviews(token),
         ]);
+        setUsers(userItems);
+        setGroups(groupItems);
+        setShares(shareItems);
         setPermissions(permissionItems);
         setReviews(reviewItems);
         setError(null);
