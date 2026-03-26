@@ -56,6 +56,31 @@ def _guess_device_type(open_ports: Iterable[int]) -> str | None:
     return None
 
 
+def _guess_operating_system(open_ports: Iterable[int]) -> str | None:
+    port_set = set(open_ports)
+    if 3389 in port_set:
+        return "Windows"
+    if 445 in port_set and 22 in port_set:
+        return "Linux/Unix server"
+    if 445 in port_set:
+        return "Windows or SMB appliance"
+    if 22 in port_set:
+        return "Linux/Unix"
+    if 80 in port_set or 443 in port_set:
+        return "Embedded/Web appliance"
+    return None
+
+
+def _resolve_dns_name(ip_address: str) -> str | None:
+    try:
+        hostname, _, _ = socket.gethostbyaddr(ip_address)
+    except OSError:
+        return None
+
+    normalized = hostname.strip().rstrip(".")
+    return normalized or None
+
+
 def _fallback_hosts() -> list[DiscoveredHost]:
     hosts: list[DiscoveredHost] = []
     try:
@@ -78,29 +103,34 @@ def _run_nmap_scan(network_range: str, ports: str) -> list[DiscoveredHost]:
     if nmap is None or shutil.which("nmap") is None:
         return _fallback_hosts()
 
-    scanner = nmap.PortScanner()
-    scanner.scan(hosts=network_range, arguments=f"-sn -PE -n --host-timeout {settings.network_scan_ping_timeout_ms}ms")
-    active_hosts = [host for host in scanner.all_hosts() if scanner[host].state() == "up"]
+    ping_scanner = nmap.PortScanner()
+    ping_scanner.scan(hosts=network_range, arguments=f"-sn -PE -n --host-timeout {settings.network_scan_ping_timeout_ms}ms")
+    active_hosts = [host for host in ping_scanner.all_hosts() if ping_scanner[host].state() == "up"]
     if not active_hosts:
         return []
 
     port_hosts = " ".join(active_hosts)
-    scanner.scan(hosts=port_hosts, arguments=f"-Pn -n -p {ports} --open")
+    port_scanner = nmap.PortScanner()
+    port_scanner.scan(hosts=port_hosts, arguments=f"-Pn -n -p {ports} --open")
 
     discovered: list[DiscoveredHost] = []
     for host in active_hosts:
-        host_state = scanner[host]
-        addresses = host_state.get("addresses", {})
-        vendor_map = host_state.get("vendor", {})
-        tcp_ports = sorted(host_state.get("tcp", {}).keys())
+        ping_state = ping_scanner[host]
+        port_state = port_scanner._scan_result.get("scan", {}).get(host, {})
+
+        addresses = port_state.get("addresses") or ping_state.get("addresses", {})
+        vendor_map = port_state.get("vendor") or ping_state.get("vendor", {})
+        hostname_entries = port_state.get("hostnames") or ping_state.get("hostnames", []) or []
+        tcp_ports = sorted((port_state.get("tcp") or {}).keys())
+
         discovered.append(
             DiscoveredHost(
                 ip_address=host,
                 mac_address=_normalize_mac(addresses.get("mac")),
-                hostname=next(iter(host_state.get("hostnames", []) or []), {}).get("name"),
+                hostname=next(iter(hostname_entries), {}).get("name") or _resolve_dns_name(host),
                 vendor=next(iter(vendor_map.values()), None) if isinstance(vendor_map, dict) else None,
                 device_type=_guess_device_type(tcp_ports),
-                operating_system=None,
+                operating_system=_guess_operating_system(tcp_ports),
                 open_ports=tcp_ports,
             )
         )
@@ -179,9 +209,10 @@ def run_network_scan(
                 ip_address=host.ip_address,
                 mac_address=_normalize_mac(host.mac_address),
                 hostname=host.hostname,
+                dns_name=_resolve_dns_name(host.ip_address),
                 vendor=host.vendor,
                 device_type=host.device_type or _guess_device_type(host.open_ports or []),
-                operating_system=host.operating_system,
+                operating_system=host.operating_system or _guess_operating_system(host.open_ports or []),
                 status="online",
                 is_monitored=True,
                 open_ports=",".join(str(port) for port in (host.open_ports or [])) or None,
@@ -194,9 +225,10 @@ def run_network_scan(
         else:
             device.mac_address = _normalize_mac(host.mac_address) or device.mac_address
             device.hostname = host.hostname or device.hostname
+            device.dns_name = _resolve_dns_name(host.ip_address) or device.dns_name
             device.vendor = host.vendor or device.vendor
             device.device_type = host.device_type or device.device_type or _guess_device_type(host.open_ports or [])
-            device.operating_system = host.operating_system or device.operating_system
+            device.operating_system = host.operating_system or device.operating_system or _guess_operating_system(host.open_ports or [])
             device.status = "online"
             device.open_ports = ",".join(str(port) for port in (host.open_ports or [])) or device.open_ports
             device.last_seen_at = now
@@ -254,6 +286,9 @@ def list_network_devices(
         predicate = or_(
             NetworkDevice.ip_address.ilike(like_value),
             NetworkDevice.hostname.ilike(like_value),
+            NetworkDevice.display_name.ilike(like_value),
+            NetworkDevice.asset_label.ilike(like_value),
+            NetworkDevice.dns_name.ilike(like_value),
             NetworkDevice.mac_address.ilike(like_value),
         )
         query = query.where(predicate)

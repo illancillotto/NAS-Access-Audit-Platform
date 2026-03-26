@@ -73,8 +73,13 @@ def setup_database(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, Non
         ip_address="192.168.1.10",
         mac_address="aa:bb:cc:dd:ee:01",
         hostname="switch-core",
+        display_name="Core Switch",
+        asset_label="SW-CORE-01",
         vendor="Cisco",
         device_type="network-service",
+        dns_name="switch-core.local",
+        location_hint="CED piano terra",
+        notes="Switch principale edificio A",
         status="online",
         open_ports="22,443",
         first_seen_at=datetime.now(UTC),
@@ -153,7 +158,7 @@ def setup_database(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, Non
 
         return Result()
 
-    monkeypatch.setattr("app.api.routes.network.run_network_scan", fake_run_network_scan)
+    monkeypatch.setattr("app.modules.network.router.run_network_scan", fake_run_network_scan)
 
     yield
 
@@ -187,6 +192,28 @@ def test_network_devices_support_filters() -> None:
     assert payload["total"] == 1
     assert payload["items"][0]["hostname"] == "pc-contabilita"
     assert payload["items"][0]["status"] == "offline"
+
+
+def test_network_device_metadata_can_be_updated() -> None:
+    response = client.patch(
+        "/network/devices/2",
+        headers=auth_headers(),
+        json={
+            "display_name": "PC Contabilita 01",
+            "asset_label": "PC-ACC-01",
+            "location_hint": "Ufficio contabilita",
+            "notes": "Postazione fissa piano primo",
+            "is_monitored": False,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["display_name"] == "PC Contabilita 01"
+    assert payload["asset_label"] == "PC-ACC-01"
+    assert payload["location_hint"] == "Ufficio contabilita"
+    assert payload["notes"] == "Postazione fissa piano primo"
+    assert payload["is_monitored"] is False
 
 
 def test_network_floor_plan_returns_positions() -> None:

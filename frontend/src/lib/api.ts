@@ -25,6 +25,7 @@ import type {
   NetworkDashboardSummary,
   NetworkDevice,
   NetworkDeviceListResponse,
+  NetworkDeviceUpdateInput,
   NetworkFloorPlan,
   NetworkFloorPlanDetail,
   NetworkScan,
@@ -307,6 +308,20 @@ export async function getNetworkDevice(token: string, deviceId: number): Promise
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function updateNetworkDevice(
+  token: string,
+  deviceId: number,
+  payload: NetworkDeviceUpdateInput,
+): Promise<NetworkDevice> {
+  return request<NetworkDevice>(`/network/devices/${deviceId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
   });
 }
 

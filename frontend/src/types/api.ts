@@ -97,9 +97,14 @@ export type NetworkDevice = {
   ip_address: string;
   mac_address: string | null;
   hostname: string | null;
+  display_name: string | null;
+  asset_label: string | null;
   vendor: string | null;
   device_type: string | null;
   operating_system: string | null;
+  dns_name: string | null;
+  location_hint: string | null;
+  notes: string | null;
   status: string;
   is_monitored: boolean;
   open_ports: string | null;
@@ -107,6 +112,16 @@ export type NetworkDevice = {
   last_seen_at: string;
   created_at: string;
   updated_at: string;
+};
+
+export type NetworkDeviceUpdateInput = {
+  display_name?: string | null;
+  asset_label?: string | null;
+  device_type?: string | null;
+  operating_system?: string | null;
+  location_hint?: string | null;
+  notes?: string | null;
+  is_monitored?: boolean;
 };
 
 export type NetworkDeviceListResponse = {

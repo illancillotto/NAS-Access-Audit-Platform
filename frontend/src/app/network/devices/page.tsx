@@ -17,7 +17,8 @@ const columns: ColumnDef<NetworkDevice>[] = [
     header: "Host",
     cell: ({ row }) => (
       <div>
-        <p className="font-medium text-gray-900">{row.original.hostname || "Host non risolto"}</p>
+        <p className="font-medium text-gray-900">{row.original.display_name || row.original.hostname || row.original.ip_address}</p>
+        <p className="text-xs text-gray-500">{row.original.asset_label || row.original.hostname || row.original.dns_name || "Host non risolto"}</p>
         <p className="text-xs text-gray-500">{row.original.ip_address}</p>
       </div>
     ),

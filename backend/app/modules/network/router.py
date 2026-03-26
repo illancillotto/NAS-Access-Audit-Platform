@@ -16,6 +16,7 @@ from app.modules.network.schemas import (
     NetworkDashboardSummary,
     NetworkDeviceListResponse,
     NetworkDeviceResponse,
+    NetworkDeviceUpdateRequest,
     NetworkScanResponse,
     NetworkScanTriggerResponse,
 )
@@ -67,6 +68,28 @@ def get_device(
     device = db.get(NetworkDevice, device_id)
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    return NetworkDeviceResponse.model_validate(device)
+
+
+@router.patch("/devices/{device_id}", response_model=NetworkDeviceResponse)
+def patch_device(
+    device_id: int,
+    payload: NetworkDeviceUpdateRequest,
+    current_user: Annotated[ApplicationUser, Depends(require_active_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> NetworkDeviceResponse:
+    _require_network_module(current_user)
+    device = db.get(NetworkDevice, device_id)
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    for field_name, field_value in updates.items():
+        setattr(device, field_name, field_value)
+
+    db.add(device)
+    db.commit()
+    db.refresh(device)
     return NetworkDeviceResponse.model_validate(device)
 
 

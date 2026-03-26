@@ -21,9 +21,14 @@ class NetworkDeviceResponse(BaseModel):
     ip_address: str
     mac_address: str | None
     hostname: str | None
+    display_name: str | None
+    asset_label: str | None
     vendor: str | None
     device_type: str | None
     operating_system: str | None
+    dns_name: str | None
+    location_hint: str | None
+    notes: str | None
     status: str
     is_monitored: bool
     open_ports: str | None
@@ -31,6 +36,16 @@ class NetworkDeviceResponse(BaseModel):
     last_seen_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class NetworkDeviceUpdateRequest(BaseModel):
+    display_name: str | None = None
+    asset_label: str | None = None
+    device_type: str | None = None
+    operating_system: str | None = None
+    location_hint: str | None = None
+    notes: str | None = None
+    is_monitored: bool | None = None
 
 
 class NetworkDeviceListResponse(BaseModel):
