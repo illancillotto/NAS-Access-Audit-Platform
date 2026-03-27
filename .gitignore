@@ -23,6 +23,7 @@ pnpm-debug.log*
 .env.*.local
 backend/.env
 frontend/.env
+.venv/
 
 # Logs
 logs/
@@ -33,6 +34,7 @@ dist/
 build/
 coverage/
 *.egg-info/
+frontend/tsconfig.tsbuildinfo
 
 # Docker
 .docker/
