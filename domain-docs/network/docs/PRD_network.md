@@ -44,12 +44,12 @@ Il backend esegue scansioni periodiche della rete locale e salva i risultati com
 
 | Requisito | Priorità | Descrizione |
 |-----------|----------|-------------|
-| RF-NET-01 | MUST | Scansione LAN tramite nmap con rilevamento IP, MAC, hostname, vendor |
+| RF-NET-01 | MUST | Scansione LAN tramite nmap con rilevamento IP, MAC, hostname, porte aperte e classificazione iniziale |
 | RF-NET-02 | MUST | Scansione schedulata configurabile (default: ogni 15 minuti) |
 | RF-NET-03 | MUST | Salvataggio snapshot con timestamp e delta rispetto alla scan precedente |
 | RF-NET-04 | SHOULD | Lettura alternativa via tabella ARP del gateway (fallback senza privilegi root) |
 | RF-NET-05 | SHOULD | Rilevamento sistema operativo tramite OS fingerprinting nmap |
-| RF-NET-06 | COULD | Integrazione SNMP per router e switch gestiti |
+| RF-NET-06 | SHOULD | Enrichment best-effort via SNMP, mDNS e NetBIOS per hostname, modello, vendor e sistema operativo quando disponibili |
 
 ### 2.2 Mappa dispositivi
 
@@ -59,6 +59,7 @@ L'interfaccia presenta i dispositivi rilevati su una mappa interattiva organizza
 |-----------|----------|-------------|
 | RF-MAP-01 | MUST | Lista tabulare dispositivi con IP, MAC, hostname, vendor, stato, ultimo visto |
 | RF-MAP-02 | MUST | Filtri per stato (online/offline), piano, tipo dispositivo |
+| RF-MAP-02B | MUST | Possibilità di assegnare manualmente `display_name` e `asset_label` a ogni dispositivo |
 | RF-MAP-03 | SHOULD | Planimetria per piano con posizionamento manuale drag-and-drop dei dispositivi |
 | RF-MAP-04 | SHOULD | Caricamento planimetria in formato SVG o PNG da parte dell'admin |
 | RF-MAP-05 | SHOULD | Badge stato real-time (verde/rosso) sovrapposto alla planimetria |
@@ -88,6 +89,14 @@ L'interfaccia presenta i dispositivi rilevati su una mappa interattiva organizza
 - I dispositivi non matchati vengono presentati come "non riconosciuti" per revisione manuale
 - Un dispositivo in Inventario mostra il suo stato di rete corrente nella scheda dettaglio
 
+### 2.6 Enrichment e naming device
+
+- Ogni dispositivo puo avere un nome operativo assegnato manualmente (`display_name`) e una etichetta inventariale (`asset_label`)
+- Il backend conserva anche il nome osservato automaticamente (`hostname`) e la sua sorgente (`hostname_source`)
+- Il sistema salva le sorgenti di arricchimento effettivamente usate (`metadata_sources`) per rendere ispezionabile il dato
+- L'ordine di preferenza del nome osservato e: `nmap`, `snmp`, `netbios`, `mdns`, `dns`
+- SNMP usa community globali e opzionalmente profili per subnet
+
 ---
 
 ## 3. Modello dati
@@ -97,7 +106,7 @@ L'interfaccia presenta i dispositivi rilevati su una mappa interattiva organizza
 | Tabella | Descrizione |
 |---------|-------------|
 | `network_scans` | Snapshot di scansione: `id, started_at, completed_at, status, devices_count` |
-| `network_devices` | Dispositivo rilevato: `id, scan_id, ip, mac, hostname, vendor, os_guess, is_online, first_seen, last_seen` |
+| `network_devices` | Dispositivo rilevato: `id, scan_id, ip, mac, hostname, hostname_source, display_name, asset_label, vendor, model_name, metadata_sources, os_guess, is_online, first_seen, last_seen` |
 | `network_alerts` | Alert generato: `id, device_id, alert_type, severity, created_at, resolved_at` |
 | `floor_plans` | Planimetria: `id, name, floor_number, building, image_path, created_at` |
 | `device_positions` | Posizione su planimetria: `device_id, floor_plan_id, x, y, updated_at` |
@@ -124,6 +133,7 @@ L'interfaccia presenta i dispositivi rilevati su una mappa interattiva organizza
 | `GET /network/scans/{id}/diff/{id2}` | Confronto tra due snapshot |
 | `GET /network/devices` | Lista dispositivi con filtri (stato, piano, vendor) |
 | `GET /network/devices/{id}` | Dettaglio dispositivo con storico e posizione |
+| `PATCH /network/devices/{id}` | Aggiorna naming operativo e metadati manuali del dispositivo |
 | `GET /network/alerts` | Lista alert attivi e risolti |
 | `PATCH /network/alerts/{id}` | Aggiorna stato alert (risolto/ignorato) |
 | `GET /network/floor-plans` | Lista planimetrie disponibili |
@@ -155,7 +165,20 @@ scanner:
   environment:
     - NETWORK_SCAN_INTERVAL_SECONDS=900
     - NETWORK_RANGE=192.168.1.0/24
+    - NETWORK_SCAN_PORTS=22,80,161,443,445,3389
+    - NETWORK_ENRICHMENT_TIMEOUT_SECONDS=1.0
+    - NETWORK_SNMP_COMMUNITIES=public
+    - NETWORK_SNMP_COMMUNITY_PROFILES=[]
     - DATABASE_URL=${DATABASE_URL}
+```
+
+Formato `NETWORK_SNMP_COMMUNITY_PROFILES`:
+
+```json
+[
+  { "cidr": "192.168.1.0/24", "communities": ["public", "rete-lan"] },
+  { "cidr": "192.168.10.0/24", "communities": ["switch-mgmt"] }
+]
 ```
 
 ### 5.2 Stack tecnologico
@@ -188,7 +211,7 @@ frontend/src/app/
     floor-plan/
     alerts/
     scans/
-modules/network/docs/
+domain-docs/network/docs/
   PRD_network.md
   PROMPT_CODEX_network.md
 ```

@@ -21,7 +21,7 @@ Questa base documenta le convenzioni da mantenere durante lo sviluppo assistito 
 - backend: nuove feature dentro moduli dedicati in `backend/app`
 - frontend: route e componenti in `frontend/src`
 - devops: compose e Dockerfile come fonte principale di esecuzione
-- docs: aggiornare sempre i file in `modules/accessi/docs/` quando cambia il perimetro
+- docs: aggiornare sempre i file in `domain-docs/accessi/docs/` quando cambia il perimetro
 
 ## 4. Prompt Operativo Consigliato
 

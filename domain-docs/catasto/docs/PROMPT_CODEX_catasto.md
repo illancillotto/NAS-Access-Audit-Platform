@@ -84,7 +84,7 @@ catasto_captcha_log
 catasto_comuni
 ```
 
-Riferimento funzionale e campi iniziali: `modules/catasto/docs/PRD_catasto.md`, sezione modello dati.
+Riferimento funzionale e campi iniziali: `domain-docs/catasto/docs/PRD_catasto.md`, sezione modello dati.
 
 Linee guida:
 
@@ -107,7 +107,7 @@ Pattern architetturale:
 - modelli SQLAlchemy in `models.py`
 - eventuale realtime tramite WebSocket o meccanismo equivalente integrato nel backend condiviso
 
-Riferimento endpoint: `modules/catasto/docs/PRD_catasto.md`, sezione API.
+Riferimento endpoint: `domain-docs/catasto/docs/PRD_catasto.md`, sezione API.
 
 Se previsti canali realtime, devono essere pubblicati dal backend condiviso e non da un servizio applicativo parallelo.
 
@@ -175,7 +175,7 @@ Linee guida frontend:
 
 ## Flusso operativo SISTER
 
-Usa `modules/catasto/docs/PRD_catasto.md` come riferimento funzionale per:
+Usa `domain-docs/catasto/docs/PRD_catasto.md` come riferimento funzionale per:
 
 - formato CSV atteso
 - stati batch e richieste
@@ -197,4 +197,4 @@ Quando implementi o modifichi il modulo Catasto:
 - mantieni separati router HTTP, modelli, schemi, servizi e logica del worker
 - non spostare la logica di automazione browser nel backend HTTP se puo restare nel worker tecnico
 - preserva compatibilita con il monolite condiviso, con Alembic unico e con il database unico
-- usa `modules/catasto/docs/PRD_catasto.md` come riferimento funzionale, ma fai prevalere l'architettura canonica del repository quando trovi indicazioni obsolete nei documenti piu vecchi
+- usa `domain-docs/catasto/docs/PRD_catasto.md` come riferimento funzionale, ma fai prevalere l'architettura canonica del repository quando trovi indicazioni obsolete nei documenti piu vecchi

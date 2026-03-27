@@ -33,6 +33,7 @@ Il repository adotta una struttura canonica in cui il backend applicativo vive s
 - python-nmap
 - APScheduler
 - scapy per fallback ARP scan
+- pysnmp per enrichment SNMP best-effort
 
 **Frontend**
 - Next.js
@@ -77,7 +78,7 @@ device_positions
 device_inventory_links
 ```
 
-Riferimento funzionale e campi iniziali: `modules/network/docs/PRD_network.md`, sezione modello dati.
+Riferimento funzionale e campi iniziali: `domain-docs/network/docs/PRD_network.md`, sezione modello dati.
 
 Linee guida:
 
@@ -100,7 +101,7 @@ Pattern architetturale:
 - modelli SQLAlchemy in `models.py`
 - codice dello scheduler o del motore di scansione mantenuto separato dal layer HTTP
 
-Riferimento endpoint: `modules/network/docs/PRD_network.md`, sezione API.
+Riferimento endpoint: `domain-docs/network/docs/PRD_network.md`, sezione API.
 
 ---
 
@@ -154,6 +155,9 @@ Linee guida frontend:
 - non introdurre nuovi path primari fuori da `backend/app/modules/network/` per il codice backend di dominio
 - il servizio `scanner` richiede permessi di rete dedicati, ad esempio `NET_RAW` e `NET_ADMIN`, nel `docker-compose.yml`
 - il range di rete deve essere configurabile via environment
+- l'enrichment hostname deve supportare piu sorgenti: `nmap`, `snmp`, `netbios`, `mdns`, `dns`
+- il modulo deve preservare sia il nome osservato automaticamente sia il naming operativo assegnato manualmente
+- il formato di `NETWORK_SNMP_COMMUNITY_PROFILES` deve restare un JSON array di oggetti `{ "cidr": "...", "communities": ["..."] }`
 - privilegiare scansioni incrementali e costi controllati
 - nessuna modifica attiva alla rete: solo discovery, osservazione, persistenza e visualizzazione
 - l'integrazione con Inventario usa dati condivisi nel DB, non API inter-modulo
@@ -170,4 +174,5 @@ Quando implementi o modifichi il modulo Rete:
 - tratta i file legacy fuori da `app/modules/` come wrapper compatibili, non come punto di partenza per nuove feature
 - aggiungi o modifica integrazioni backend passando sempre da `backend/app/api/router.py` e dal router di modulo
 - preserva compatibilita con il monolite condiviso, con Alembic unico e con il database unico
-- usa `modules/network/docs/PRD_network.md` come riferimento funzionale, ma fai prevalere l'architettura canonica del repository quando i documenti piu vecchi divergono
+- usa `domain-docs/network/docs/PRD_network.md` come riferimento funzionale, ma fai prevalere l'architettura canonica del repository quando i documenti piu vecchi divergono
+- quando tocchi l'arricchimento device, mantieni osservabili in API/UI `hostname_source` e `metadata_sources`

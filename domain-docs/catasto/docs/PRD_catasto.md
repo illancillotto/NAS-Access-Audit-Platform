@@ -71,14 +71,14 @@ catasto_captcha_log       — log immagini CAPTCHA per training futuro
 catasto_comuni            — dizionario comuni con codici SISTER
 ```
 
-Schema completo in `modules/catasto/docs/PRD_catasto.md` sezione 3.
+Schema completo in `domain-docs/catasto/docs/PRD_catasto.md` sezione 3.
 
 ---
 
 ## API da implementare
 
 Tutti gli endpoint sotto il prefisso `/catasto`.  
-Lista completa in `modules/catasto/docs/PRD_catasto.md` sezione 4.
+Lista completa in `domain-docs/catasto/docs/PRD_catasto.md` sezione 4.
 
 Endpoint WebSocket: `ws://.../catasto/ws/{batch_id}` per aggiornamenti real-time.
 
@@ -189,7 +189,7 @@ Dockerfile del worker basato su `mcr.microsoft.com/playwright/python:v1.40.0-jam
 
 ## Flusso SISTER — Riferimento selettori
 
-Riferimento completo dei selettori in `modules/catasto/docs/PRD_catasto.md` sezione 9.
+Riferimento completo dei selettori in `domain-docs/catasto/docs/PRD_catasto.md` sezione 9.
 
 Selettori chiave:
 - Tab Sister login: `a.nav-link[href="#tab-5"]`

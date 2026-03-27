@@ -91,7 +91,7 @@ inventory_attachments
 inventory_network_links
 ```
 
-Riferimento funzionale e campi iniziali: `modules/inventory/docs/PRD_inventory.md`, sezione modello dati.
+Riferimento funzionale e campi iniziali: `domain-docs/inventory/docs/PRD_inventory.md`, sezione modello dati.
 
 Linee guida:
 
@@ -115,7 +115,7 @@ Pattern architetturale:
 - schemi request/response in `schemas.py`
 - modelli SQLAlchemy in `models.py`
 
-Riferimento endpoint: `modules/inventory/docs/PRD_inventory.md`, sezione API.
+Riferimento endpoint: `domain-docs/inventory/docs/PRD_inventory.md`, sezione API.
 
 ---
 
@@ -187,4 +187,4 @@ Quando implementi il modulo Inventario:
 - mantieni separati modelli, schemi, servizi e route
 - evita refactor non richiesti ai moduli esistenti
 - preserva compatibilita con il monolite condiviso e con il database unico
-- usa `modules/inventory/docs/PRD_inventory.md` come riferimento funzionale di base, ma fai prevalere l'architettura canonica del repository quando trovi indicazioni obsolete nei documenti piu vecchi
+- usa `domain-docs/inventory/docs/PRD_inventory.md` come riferimento funzionale di base, ma fai prevalere l'architettura canonica del repository quando trovi indicazioni obsolete nei documenti piu vecchi

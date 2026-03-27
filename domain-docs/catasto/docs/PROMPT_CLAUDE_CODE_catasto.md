@@ -5,8 +5,8 @@
 
 > Copia e incolla questo come primo messaggio in Claude Code.
 > Prima di usarlo, assicurati di aver copiato nella repo:
->   - modules/catasto/docs/PRD_catasto.md
->   - modules/catasto/docs/PROMPT_CODEX_catasto.md
+>   - domain-docs/catasto/docs/PRD_catasto.md
+>   - domain-docs/catasto/docs/PROMPT_CODEX_catasto.md
 
 ---
 
@@ -18,14 +18,14 @@ Devi sviluppare **GAIA Catasto**, il quarto modulo della piattaforma. È un sist
 
 Leggi attentamente questi file prima di iniziare:
 
-1. `modules/catasto/docs/PRD_catasto.md` — PRD completo con requisiti, modello dati, API, flusso SISTER
-2. `modules/catasto/docs/PROMPT_CODEX_catasto.md` — convenzioni architetturali, stack, vincoli tecnici
+1. `domain-docs/catasto/docs/PRD_catasto.md` — PRD completo con requisiti, modello dati, API, flusso SISTER
+2. `domain-docs/catasto/docs/PROMPT_CODEX_catasto.md` — convenzioni architetturali, stack, vincoli tecnici
 
 Studia anche la struttura dei moduli già esistenti come riferimento per naming e pattern:
 3. `backend/` — backend FastAPI esistente (router, models, schemas, services)
 4. `frontend/` — frontend Next.js esistente
 5. `docker-compose.yml` — configurazione Docker esistente
-6. `modules/accessi/docs/CODEX_PROMPT.md` — convenzioni generali del progetto
+6. `domain-docs/accessi/docs/CODEX_PROMPT.md` — convenzioni generali del progetto
 
 ## Principi fondamentali
 

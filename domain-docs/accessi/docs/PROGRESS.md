@@ -16,8 +16,8 @@ Il repository e in una fase di bootstrap avanzato: la base documentale, il backe
 ### Repository e Convenzioni
 
 - file root inizializzati: `README.md`, `.gitignore`, `.editorconfig`, `.env.example`, `Makefile`
-- naming coerente tra `backend/`, `frontend/`, `modules/accessi/docs/`, `scripts/`, `nginx/`
-- documentazione iniziale centralizzata in `modules/accessi/docs/`
+- naming coerente tra `backend/`, `frontend/`, `domain-docs/accessi/docs/`, `scripts/`, `nginx/`
+- documentazione iniziale centralizzata in `domain-docs/accessi/docs/`
 
 ### Backend
 

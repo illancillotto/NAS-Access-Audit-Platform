@@ -20,7 +20,7 @@ Stato: completato e funzionante.
 ### GAIA Rete — Network Monitor
 Monitoraggio della rete LAN: scansione dispositivi, mappa interattiva per piano,
 alert per dispositivi nuovi o non raggiungibili.
-Stato: in sviluppo.
+Stato: operativo MVP.
 
 ### GAIA Inventario — IT Inventory
 Registro centralizzato dei dispositivi IT: anagrafica, garanzie, assegnazioni,
@@ -44,28 +44,28 @@ Il frontend condiviso della piattaforma vive in `frontend/`.
 ## Struttura repository
 ```text
 GAIA/
+├── domain-docs/
+│   ├── accessi/docs/
+│   ├── anagrafica/docs/
+│   ├── catasto/docs/
+│   ├── inventory/docs/
+│   └── network/docs/
 ├── frontend/
 │   └── src/app/
 │       ├── nas-control/
+│       ├── anagrafica/
 │       ├── network/
 │       ├── inventory/
 │       └── catasto/
 ├── modules/
-│   ├── accessi/
-│   │   └── docs/
-│   ├── network/
-│   │   └── docs/
-│   │       ├── PRD_network.md
-│   │       └── PROMPT_CODEX_network.md
-│   └── inventory/
-│       └── docs/
-│           ├── PRD_inventory.md
-│           └── PROMPT_CODEX_inventory.md
+│   └── catasto/
+│       └── worker/
 ├── backend/
 │   ├── app/
 │   │   ├── modules/
 │   │   │   ├── core/
 │   │   │   ├── accessi/
+│   │   │   ├── anagrafica/
 │   │   │   ├── network/
 │   │   │   ├── inventory/
 │   │   │   └── catasto/
@@ -79,6 +79,13 @@ GAIA/
 ├── Makefile
 └── .env.example
 ```
+
+## Convenzioni repository
+
+- `domain-docs/` contiene PRD, prompt, execution plan e progress dei domini funzionali.
+- `backend/app/modules/<modulo>/` contiene il codice backend runtime dei moduli.
+- `frontend/src/app/<modulo>/` contiene il codice frontend runtime dei moduli.
+- `modules/` non e piu il contenitore dei moduli applicativi; resta disponibile solo per asset tecnici specifici, come `modules/catasto/worker/`.
 
 ## Architettura backend attuale
 
@@ -119,14 +126,17 @@ I package storici fuori da `app/modules/` restano disponibili come layer di comp
 
 ## Documentazione
 
-- GAIA Accessi: `modules/accessi/docs/`
-- GAIA Rete PRD: `modules/network/docs/PRD_network.md`
-- GAIA Rete Prompt: `modules/network/docs/PROMPT_CODEX_network.md`
+- GAIA Accessi: `domain-docs/accessi/docs/`
+- GAIA Anagrafica PRD: `domain-docs/anagrafica/docs/PRD_anagrafica.md`
+- GAIA Anagrafica Prompt: `domain-docs/anagrafica/docs/PROMPT_CODEX_anagrafica.md`
+- GAIA Anagrafica Plan: `domain-docs/anagrafica/docs/EXECUTION_PLAN.md`
+- GAIA Rete PRD: `domain-docs/network/docs/PRD_network.md`
+- GAIA Rete Prompt: `domain-docs/network/docs/PROMPT_CODEX_network.md`
 - Backend monolite modulare: `backend/app/MONOLITH_MODULAR.md`
-- GAIA Inventario PRD: `modules/inventory/docs/PRD_inventory.md`
-- GAIA Inventario Prompt: `modules/inventory/docs/PROMPT_CODEX_inventory.md`
-- GAIA Catasto PRD: `modules/catasto/docs/PRD_catasto.md`
-- GAIA Catasto Prompt: `modules/catasto/docs/PROMPT_CODEX_catasto.md`
+- GAIA Inventario PRD: `domain-docs/inventory/docs/PRD_inventory.md`
+- GAIA Inventario Prompt: `domain-docs/inventory/docs/PROMPT_CODEX_inventory.md`
+- GAIA Catasto PRD: `domain-docs/catasto/docs/PRD_catasto.md`
+- GAIA Catasto Prompt: `domain-docs/catasto/docs/PROMPT_CODEX_catasto.md`
 
 ## Catasto MVP
 
@@ -138,6 +148,38 @@ I package storici fuori da `app/modules/` restano disponibili come layer di comp
 - Variabili operative in `.env.example` per storage documenti/CAPTCHA e chiave Fernet condivisa
 - Selettori SISTER esterni in `modules/catasto/worker/sister_selectors.json`, sovrascrivibili via `CATASTO_SISTER_SELECTORS_PATH`
 - Diagnostica probe SISTER del worker con log stdout e snapshot HTML/PNG in `CATASTO_DEBUG_ARTIFACTS_PATH`
+
+## Network MVP
+
+- Scanner LAN dedicato con `nmap`, fallback `scapy`, enrichment DNS, mDNS, NetBIOS e SNMP best-effort
+- Gestione anagrafica apparati con campi manuali `display_name`, `asset_label`, `location_hint`, `notes`
+- Dettaglio dispositivo con `hostname_source` e `metadata_sources` per capire da dove arriva il nome rilevato
+- Scheduler e scanner condividono il backend monolitico e il database unico della piattaforma
+
+### Variabili operative Network
+
+- `NETWORK_RANGE`: subnet da scandire
+- `NETWORK_SCAN_PORTS`: porte da verificare sugli host attivi
+- `NETWORK_ENRICHMENT_TIMEOUT_SECONDS`: timeout per reverse DNS, mDNS, NetBIOS e SNMP
+- `NETWORK_SNMP_COMMUNITIES`: elenco CSV di community SNMP generiche
+- `NETWORK_SNMP_COMMUNITY_PROFILES`: JSON array opzionale con community per subnet specifiche
+
+Esempio `NETWORK_SNMP_COMMUNITY_PROFILES`:
+
+```json
+[
+  { "cidr": "192.168.1.0/24", "communities": ["public", "rete-lan"] },
+  { "cidr": "192.168.10.0/24", "communities": ["switch-mgmt"] }
+]
+```
+
+Ordine di risoluzione hostname del modulo Rete:
+
+1. hostname rilevato da `nmap`
+2. `sysName` SNMP
+3. nome NetBIOS
+4. nome mDNS
+5. reverse DNS
 
 ## Comandi utili
 
